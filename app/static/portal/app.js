@@ -12,7 +12,8 @@ const CONFIG = {
   API_BASE_URL: "/api",
   ENDPOINTS: {
     CHAT: "/chat/",
-    VETERAN_STORY: "/events/"
+    VETERAN_STORY: "/events/",
+    LOCATE_EVENT: "/events/locate/"
   },
   // Modo simulación local activado para probar de inmediato sin depender del backend:
   USE_MOCK: false
@@ -124,6 +125,9 @@ let map = null;
 let markersMap = new Map();
 let activePointId = null;
 let currentChatMode = "testimonio_veterano"; // o "consulta_historica"
+let testimonyLayer = null; // Grupo de marcadores de testimonios persistidos en la base de datos
+let testimonyEvents = [];
+let pickingLocation = false; // Modo "Marcar lugar en el mapa"
 
 // ==================== INICIALIZACIÓN AL CARGAR EL DOM ====================
 document.addEventListener("DOMContentLoaded", () => {
@@ -185,6 +189,15 @@ function initMap() {
   // Renderizar marcadores conmemorativos
   renderHistoricalMarkers();
 
+  // Testimonios registrados por los veteranos (persistidos en PostgreSQL vía /api/events/)
+  initTestimonyLayer();
+  loadTestimonyEvents();
+
+  // Clic en el mapa: solo actúa en modo "Marcar lugar en el mapa"
+  map.on("click", (e) => {
+    if (pickingLocation) submitPickedLocation(e.latlng);
+  });
+
   // Actualizar coordenadas en pantalla al mover el ratón
   map.on("mousemove", (e) => {
     const lat = e.latlng.lat.toFixed(4);
@@ -242,6 +255,108 @@ function renderHistoricalMarkers() {
 
     markersMap.set(pto.id, marker);
   });
+}
+
+// ==================== 2.b TESTIMONIOS REGISTRADOS (BASE DE DATOS) ====================
+// Visualización por escala: a nivel archipiélago / región los testimonios se agrupan en un círculo
+// con la cantidad; al acercarse se individualizan, y los que comparten ubicación se despliegan al hacer clic.
+// Cada evento trae su "zoom_level" (escala del lugar), usado para centrar la cámara sobre él.
+function initTestimonyLayer() {
+  testimonyLayer = L.markerClusterGroup({
+    showCoverageOnHover: false,
+    maxClusterRadius: (zoom) => (zoom < 11 ? 70 : 35),
+    iconCreateFunction: (cluster) => L.divIcon({
+      className: "custom-marker-wrapper",
+      html: `<div class="testimony-cluster"><i class="fa-solid fa-microphone-lines"></i>${cluster.getChildCount()}</div>`,
+      iconSize: [40, 40],
+      iconAnchor: [20, 20]
+    })
+  });
+  map.addLayer(testimonyLayer);
+}
+
+async function loadTestimonyEvents() {
+  if (CONFIG.USE_MOCK) return;
+  try {
+    const response = await fetch(CONFIG.API_BASE_URL + CONFIG.ENDPOINTS.VETERAN_STORY);
+    if (!response.ok) throw new Error("HTTP error " + response.status);
+    const data = await response.json();
+    testimonyEvents = data.events || [];
+    renderTestimonyMarkers();
+    updatePointsCount();
+  } catch (err) {
+    console.error("Error cargando testimonios:", err);
+  }
+}
+
+function renderTestimonyMarkers() {
+  testimonyLayer.clearLayers();
+  testimonyEvents.forEach((ev) => {
+    const icon = L.divIcon({
+      className: "custom-marker-wrapper",
+      html: `
+        <div class="testimony-pin ${ev.location_source === "Usuario" ? "user-located" : ""}" title="${escapeHtml(ev.toponymy)}">
+          <i class="fa-solid fa-microphone-lines"></i>
+        </div>
+      `,
+      iconSize: [28, 28],
+      iconAnchor: [14, 14]
+    });
+
+    const marker = L.marker([ev.latitude, ev.longitude], { icon });
+    marker.bindPopup(`
+      <div class="custom-popup-content">
+        <h3>${escapeHtml(ev.toponymy)}</h3>
+        <p><strong>${escapeHtml(ev.event_date)}</strong>${ev.units ? " &bull; " + escapeHtml(ev.units) : ""}</p>
+        ${ev.quote ? `<p class="testimony-quote">${escapeHtml(ev.quote)}</p>` : ""}
+        <p><i class="fa-solid fa-user-shield"></i> ${escapeHtml(ev.witness)}</p>
+        <p class="testimony-status">${escapeHtml(ev.validation_status)}</p>
+      </div>
+    `, { maxWidth: 280 });
+
+    marker.eventId = ev.event_id;
+    testimonyLayer.addLayer(marker);
+  });
+}
+
+// Lleva la cámara al testimonio recién registrado, a la escala del lugar, y abre su ficha
+function focusTestimony(eventId) {
+  const ev = testimonyEvents.find((e) => e.event_id === eventId);
+  if (!ev) return;
+  map.flyTo([ev.latitude, ev.longitude], ev.zoom_level, { duration: 1.4 });
+  map.once("moveend", () => {
+    testimonyLayer.eachLayer((marker) => {
+      if (marker.eventId === eventId) testimonyLayer.zoomToShowLayer(marker, () => marker.openPopup());
+    });
+  });
+}
+
+// ==================== 2.c MODO "MARCAR LUGAR EN EL MAPA" ====================
+function setPickingLocation(active) {
+  pickingLocation = active;
+  document.getElementById("map").classList.toggle("picking-location", active);
+  const banner = document.getElementById("map-pick-banner");
+  if (banner) banner.hidden = !active;
+  // El chat se oculta mientras se marca el punto para dejar el mapa despejado (en móvil lo cubre)
+  const widgetContainer = document.getElementById("chatbot-container");
+  if (widgetContainer) widgetContainer.classList.toggle("open", !active);
+}
+
+async function submitPickedLocation(latlng) {
+  setPickingLocation(false);
+  showTypingIndicator(true);
+  try {
+    const result = await ChatService.locateEvent(latlng.lat, latlng.lng);
+    showTypingIndicator(false);
+    appendMessage("bot", result.reply);
+    document.getElementById("btn-locate-on-map")?.classList.remove("attention");
+    await loadTestimonyEvents();
+    focusTestimony(result.event.event_id);
+  } catch (err) {
+    showTypingIndicator(false);
+    appendMessage("bot", err.message || "No fue posible registrar el lugar marcado. Por favor, intente nuevamente.");
+    console.error("Locate error:", err);
+  }
 }
 
 // ==================== 3. CINTA INFERIOR DE FOTOS (GOOGLE MAPS STYLE) ====================
@@ -346,7 +461,7 @@ function clearActiveSelection() {
 
 function updatePointsCount() {
   const countEl = document.getElementById("points-count");
-  if (countEl) countEl.textContent = `${PUNTOS_HISTORICOS.length} hitos`;
+  if (countEl) countEl.textContent = `${PUNTOS_HISTORICOS.length} hitos · ${testimonyEvents.length} testimonios`;
 }
 
 // ==================== 4. SELECTOR DE ESCALAS FLOTANTE ====================
@@ -499,6 +614,12 @@ function initChatbot() {
     });
   }
 
+  // Ubicar el relato con un clic en el mapa (lugares fuera de la toponimia conocida)
+  const btnLocate = document.getElementById("btn-locate-on-map");
+  const btnCancelPick = document.getElementById("btn-cancel-pick");
+  if (btnLocate) btnLocate.addEventListener("click", () => setPickingLocation(true));
+  if (btnCancelPick) btnCancelPick.addEventListener("click", () => setPickingLocation(false));
+
   // Sugerencias Rápidas (Chips)
   if (chipsContainer) {
     chipsContainer.addEventListener("click", (e) => {
@@ -529,6 +650,7 @@ function initChatbot() {
         .then((response) => {
           showTypingIndicator(false);
           appendMessage("bot", response.respuesta);
+          handleChatResult(response);
         })
         .catch((err) => {
           showTypingIndicator(false);
@@ -573,6 +695,17 @@ function appendMessage(sender, text) {
 
   messagesContainer.appendChild(bubble);
   messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+// Refleja en el mapa lo que el backend persistió a partir del mensaje
+function handleChatResult(response) {
+  const btnLocate = document.getElementById("btn-locate-on-map");
+  if (btnLocate) btnLocate.classList.toggle("attention", Boolean(response.needs_location));
+
+  const extracted = response.events_extracted || [];
+  if (extracted.length) {
+    loadTestimonyEvents().then(() => focusTestimony(extracted[0].event_id));
+  }
 }
 
 function showTypingIndicator(show) {
@@ -631,6 +764,17 @@ const ChatService = {
       respuesta: data.reply,
       guardadoEnDB: Boolean(data.ok)
     };
+  },
+
+  async locateEvent(lat, lng) {
+    const response = await fetch(CONFIG.API_BASE_URL + CONFIG.ENDPOINTS.LOCATE_EVENT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lat, lng })
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "HTTP error " + response.status);
+    return data;
   },
 
   // Generador de respuestas simuladas para desarrollo local

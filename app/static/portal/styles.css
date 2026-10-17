@@ -577,6 +577,94 @@ button {
   100% { transform: scale(1.8); opacity: 0; }
 }
 
+/* Pines de Testimonios Registrados (persistidos en la base de datos) */
+.testimony-pin {
+  width: 28px;
+  height: 28px;
+  background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue-deep));
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-size: 0.75rem;
+  box-shadow: var(--shadow-glow);
+  cursor: pointer;
+  transition: transform var(--transition-fast);
+}
+
+.testimony-pin:hover {
+  transform: scale(1.2);
+}
+
+/* Ubicación marcada a mano por el testimoniante (pendiente de verificación toponímica) */
+.testimony-pin.user-located {
+  border-style: dashed;
+}
+
+/* Grupos de testimonios a escala archipiélago / región */
+.testimony-cluster {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(2, 132, 199, 0.85);
+  border: 2px solid var(--accent-cyan);
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-glow);
+}
+
+.testimony-cluster i {
+  font-size: 0.65rem;
+  margin-right: 3px;
+}
+
+.custom-popup-content .testimony-quote {
+  font-style: italic;
+  border-left: 2px solid var(--accent-cyan);
+  padding-left: 8px;
+}
+
+.custom-popup-content .testimony-status {
+  font-size: 0.7rem;
+  opacity: 0.75;
+}
+
+/* Modo "Marcar lugar en el mapa" */
+.interactive-map.picking-location {
+  cursor: crosshair;
+}
+
+.map-pick-banner {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border: 1px solid var(--accent-cyan);
+  border-radius: 10px;
+  color: #ffffff;
+  font-size: 0.82rem;
+  max-width: calc(100% - 32px);
+}
+
+.map-pick-banner[hidden] {
+  display: none;
+}
+
+.map-pick-banner button {
+  color: #ffffff;
+}
+
 /* ==================== WIDGET DE CHATBOT (BURBUJA FLOTANTE) ==================== */
 .chatbot-widget-container {
   position: fixed;
@@ -912,6 +1000,31 @@ button {
 .btn-send-message:hover {
   background: var(--accent-cyan);
   transform: scale(1.05);
+}
+
+.btn-locate-on-map {
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
+  background: rgba(2, 6, 23, 0.8);
+  color: var(--accent-cyan);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.btn-locate-on-map:hover {
+  border-color: var(--accent-cyan);
+}
+
+/* El agente solicita ubicar el relato: se resalta el botón */
+.btn-locate-on-map.attention {
+  border-color: var(--accent-gold);
+  color: var(--accent-gold);
+  box-shadow: 0 0 12px var(--accent-gold-glow);
 }
 
 /* ==================== MODALES ==================== */

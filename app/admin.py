@@ -26,7 +26,7 @@ class ChatMessageAdmin(admin.ModelAdmin):
 
 @admin.register(HistoricalEvent)
 class HistoricalEventAdmin(admin.ModelAdmin):
-    list_display = ("title", "toponymy", "event_date", "units_involved", "validation_status", "synced_to_sheets", "registered_at")
-    list_filter = ("toponymy", "validation_status", "synced_to_sheets")
+    list_display = ("title", "toponymy", "event_date", "units_involved", "zoom_level", "location_source", "validation_status", "synced_to_sheets", "registered_at")
+    list_filter = ("toponymy", "validation_status", "location_source", "synced_to_sheets")
     search_fields = ("title", "toponymy", "units_involved", "description", "quote")
     list_editable = ("validation_status",)

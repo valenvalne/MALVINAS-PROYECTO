@@ -15,6 +15,10 @@
   <!-- Leaflet.js CSS (100% Gratuito y Libre) -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
 
+  <!-- Leaflet.markercluster: agrupa los testimonios por escala y despliega los que comparten ubicación -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+
   <!-- Font Awesome para Iconografía -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
@@ -63,6 +67,13 @@
   <main class="map-viewport-wrapper">
     <!-- Contenedor del Mapa Leaflet -->
     <div id="map" class="interactive-map"></div>
+
+    <!-- Aviso del modo "Marcar lugar en el mapa" (testimonios fuera de la toponimia conocida) -->
+    <div class="map-pick-banner glass-panel" id="map-pick-banner" hidden>
+      <i class="fa-solid fa-crosshairs"></i>
+      <span>Haga clic en el mapa sobre el lugar donde ocurrió su relato</span>
+      <button type="button" id="btn-cancel-pick" title="Cancelar"><i class="fa-solid fa-xmark"></i></button>
+    </div>
 
     <!-- Barra Superior de Control de Escalas y Capas Flotante -->
     <div class="map-floating-overlay top-left">
@@ -250,6 +261,9 @@
 
       <!-- Formulario de Entrada de Mensaje -->
       <form class="chat-input-form" id="chat-form">
+        <button type="button" class="btn-locate-on-map" id="btn-locate-on-map" title="Marcar lugar en el mapa">
+          <i class="fa-solid fa-location-crosshairs"></i>
+        </button>
         <div class="input-wrapper">
           <textarea id="chat-input" placeholder="Escribe tu testimonio o consulta histórica..." rows="1" required></textarea>
         </div>
@@ -262,6 +276,8 @@
 
   <!-- Leaflet.js JS (100% Gratuito y Libre) -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 
   <!-- Lógica Principal del Frontend (Sector 1) -->
   <script src="{% static 'portal/app.js' %}"></script>

@@ -87,6 +87,10 @@ class ChatMessage(models.Model):
 
 class HistoricalEvent(models.Model):
     """Hito o acontecimiento histórico georreferenciado extraído del testimonio"""
+    LOCATION_SOURCE_CHOICES = [
+        ("Toponimia", "Detectado en el diccionario toponímico"),
+        ("Usuario", "Marcado por el testimoniante en el mapa"),
+    ]
     VALIDATION_CHOICES = [
         ("Borrador IA", "Borrador Extraído por IA"),
         ("Pendiente de Revision", "Pendiente de Revisión por Curador"),
@@ -101,6 +105,8 @@ class HistoricalEvent(models.Model):
     toponymy = models.CharField(max_length=150, verbose_name="Toponimia en Malvinas")
     latitude = models.FloatField(null=True, blank=True, verbose_name="Latitud (WGS84)")
     longitude = models.FloatField(null=True, blank=True, verbose_name="Longitud (WGS84)")
+    zoom_level = models.IntegerField(default=11, verbose_name="Zoom de Visualización (Leaflet)")
+    location_source = models.CharField(max_length=20, choices=LOCATION_SOURCE_CHOICES, default="Toponimia", verbose_name="Origen de la Ubicación")
     event_date = models.CharField(max_length=100, blank=True, default="", verbose_name="Fecha o Período del Hecho")
     units_involved = models.CharField(max_length=250, blank=True, default="", verbose_name="Unidades Involucradas")
     description = models.TextField(verbose_name="Descripción del Acontecimiento")
