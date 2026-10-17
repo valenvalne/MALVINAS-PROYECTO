@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Portal interactivo conmemorativo de la Guerra de Malvinas de 1982. Exploración cartográfica por escalas, testimonios de veteranos e inteligencia artificial para la preservación de la memoria.">
+  <title>Malvinas 1982 | Memoria, Territorio y Testimonios</title>
+
+  <!-- Google Fonts: Cinzel para títulos conmemorativos e Inter para la interfaz moderna -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Leaflet.js CSS (100% Gratuito y Libre) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+
+  <!-- Font Awesome para Iconografía -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+  <!-- Estilos del Proyecto -->
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- ==================== HEADER / HERO CONMEMORATIVO ==================== -->
+  <header class="main-header" id="main-header">
+    <div class="header-content">
+      <div class="brand">
+        <div class="memorial-crest">
+          <i class="fa-solid fa-medal"></i>
+        </div>
+        <div class="brand-text">
+          <h1>MALVINAS 1982</h1>
+          <p class="subtitle">Memoria Viva, Territorio y Testimonios de Veteranos</p>
+        </div>
+      </div>
+
+      <div class="header-badges">
+        <span class="badge badge-flag">
+          <span class="flag-dot"></span> Soberanía Histórica
+        </span>
+        <span class="badge badge-pulse">
+          <i class="fa-solid fa-satellite"></i> Leaflet Satelital Activo
+        </span>
+      </div>
+
+      <nav class="header-controls">
+        <button id="btn-reset-map" class="btn btn-secondary" title="Centrar vista en las Islas Malvinas">
+          <i class="fa-solid fa-arrows-to-dot"></i> Vista General
+        </button>
+        <button id="btn-toggle-info" class="btn btn-secondary" title="Ver información del proyecto">
+          <i class="fa-solid fa-circle-info"></i> Proyecto
+        </button>
+        <button id="btn-open-chat-header" class="btn btn-primary" title="Abrir espacio de testimonios y consultas">
+          <i class="fa-solid fa-comment-dots"></i> Testimonios & Chat
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ==================== CONTENEDOR PRINCIPAL: MAPA INTERACTIVO ==================== -->
+  <main class="map-viewport-wrapper">
+    <!-- Contenedor del Mapa Leaflet -->
+    <div id="map" class="interactive-map"></div>
+
+    <!-- Barra Superior de Control de Escalas y Capas Flotante -->
+    <div class="map-floating-overlay top-left">
+      <div class="scale-selector-card glass-panel">
+        <div class="scale-header">
+          <i class="fa-solid fa-layer-group"></i>
+          <span>Nivel de Escala</span>
+        </div>
+        <div class="scale-buttons" id="scale-buttons">
+          <button class="scale-btn active" data-zoom="8" data-lat="-51.75" data-lng="-59.10">
+            <strong>Escala 1</strong>
+            <small>Archipiélago Completo</small>
+          </button>
+          <button class="scale-btn" data-zoom="10" data-lat="-51.70" data-lng="-58.50">
+            <strong>Escala 2</strong>
+            <small>Isla Soledad / San Carlos</small>
+          </button>
+          <button class="scale-btn" data-zoom="13" data-lat="-51.692" data-lng="-57.858">
+            <strong>Escala 3</strong>
+            <small>Puerto Argentino / Montes</small>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Leyenda Cartográfica y Coordenadas -->
+    <div class="map-floating-overlay top-right">
+      <div class="coordinates-card glass-panel" id="coordinates-display">
+        <span class="coord-label"><i class="fa-solid fa-compass"></i> Posición:</span>
+        <span id="coord-values">Lat: -51.7500 | Lng: -59.1000</span>
+      </div>
+    </div>
+
+    <!-- ==================== CINTA INFERIOR DE EXPLORACIÓN FOTOGRÁFICA (Como Google Maps) ==================== -->
+    <section class="photo-exploration-strip glass-panel" id="photo-strip" aria-label="Exploración fotográfica de hitos históricos">
+      <div class="strip-header">
+        <div class="strip-title">
+          <i class="fa-solid fa-camera-retro"></i>
+          <span>Explorar Hitos y Puntos Históricos</span>
+          <span class="badge-count" id="points-count">0 puntos</span>
+        </div>
+        <div class="strip-actions">
+          <button id="btn-scroll-left" class="btn-scroll" title="Desplazar a la izquierda"><i class="fa-solid fa-chevron-left"></i></button>
+          <button id="btn-scroll-right" class="btn-scroll" title="Desplazar a la derecha"><i class="fa-solid fa-chevron-right"></i></button>
+          <button id="btn-toggle-strip" class="btn-toggle-strip" title="Minimizar / Expandir galería de fotos">
+            <i class="fa-solid fa-angle-down" id="toggle-strip-icon"></i>
+            <span id="toggle-strip-text">Ocultar fotos</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Carrusel horizontal de fotos de escala / lugares -->
+      <div class="photo-cards-container" id="photo-cards-container">
+        <!-- Generado dinámicamente desde app.js con datos de puntos históricos -->
+      </div>
+    </section>
+  </main>
+
+  <!-- ==================== MODAL DE INFORMACIÓN HISTÓRICA DETALLADA ==================== -->
+  <div class="modal-backdrop" id="modal-backdrop">
+    <div class="detail-modal glass-panel" id="detail-modal">
+      <button class="modal-close" id="modal-close-btn" aria-label="Cerrar ventana"><i class="fa-solid fa-xmark"></i></button>
+      <div class="modal-image-container">
+        <img id="modal-image" src="" alt="Fotografía histórica">
+        <div class="modal-badge-container">
+          <span class="modal-tag" id="modal-tag">Zona Histórica</span>
+        </div>
+      </div>
+      <div class="modal-body">
+        <h2 id="modal-title">Título del Hito</h2>
+        <p class="modal-date" id="modal-date"><i class="fa-regular fa-calendar"></i> Fecha clave: 1982</p>
+        <div class="modal-description" id="modal-description">
+          Descripción detallada del combate, el regimiento involucrado y su significado histórico.
+        </div>
+        <div class="modal-footer-actions">
+          <button class="btn btn-secondary" id="btn-fly-to-point">
+            <i class="fa-solid fa-location-crosshairs"></i> Enfocar en Mapa
+          </button>
+          <button class="btn btn-primary" id="btn-story-about-this">
+            <i class="fa-solid fa-feather-pointed"></i> Dejar o Consultar Testimonio sobre este lugar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL INFORMATIVO DEL PROYECTO (SECTORES 1, 2 Y 3) ==================== -->
+  <div class="modal-backdrop" id="info-modal-backdrop">
+    <div class="detail-modal glass-panel info-project-modal">
+      <button class="modal-close" id="info-modal-close-btn" aria-label="Cerrar"><i class="fa-solid fa-xmark"></i></button>
+      <div class="modal-body">
+        <h2>Proyecto Académico: Malvinas 1982</h2>
+        <p class="lead-text">Plataforma interactiva para la divulgación histórica y el rescate de la memoria viva.</p>
+        
+        <div class="sectors-grid">
+          <div class="sector-card active-sector">
+            <div class="sector-icon"><i class="fa-solid fa-laptop-code"></i></div>
+            <h3>Sector 1 (Frontend UI/UX)</h3>
+            <p>Mapa satelital libre (Leaflet.js), galería de fotos sincronizada y widget conversacional.</p>
+            <span class="sector-status">Módulo Actual</span>
+          </div>
+
+          <div class="sector-card">
+            <div class="sector-icon"><i class="fa-solid fa-brain"></i></div>
+            <h3>Sector 2 (Agente IA)</h3>
+            <p>Procesamiento de lenguaje natural y recopilación respetuosa de historias de veteranos.</p>
+            <span class="sector-status">En Desarrollo</span>
+          </div>
+
+          <div class="sector-card">
+            <div class="sector-icon"><i class="fa-solid fa-server"></i></div>
+            <h3>Sector 3 (API & Base de Datos)</h3>
+            <p>Persistencia segura de testimonios, gestión de sesiones y almacenamiento histórico.</p>
+            <span class="sector-status">En Desarrollo</span>
+          </div>
+        </div>
+
+        <div class="modal-footer-actions">
+          <button class="btn btn-primary" id="btn-close-project-info">Entendido</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== WIDGET DE CHATBOT (BURBUJA FLOTANTE) ==================== -->
+  <div class="chatbot-widget-container" id="chatbot-container">
+    <!-- Botón Burbuja Flotante -->
+    <button class="chat-bubble-button" id="chat-toggle-button" aria-label="Abrir asistente de testimonios y consultas">
+      <div class="bubble-pulse-ring"></div>
+      <i class="fa-solid fa-comment-dots icon-open"></i>
+      <i class="fa-solid fa-xmark icon-close"></i>
+      <span class="bubble-notification-dot"></span>
+    </button>
+
+    <!-- Ventana Desplegable del Chatbot -->
+    <div class="chat-window glass-panel" id="chat-window">
+      <!-- Encabezado del Chat -->
+      <div class="chat-header">
+        <div class="chat-avatar">
+          <i class="fa-solid fa-flag"></i>
+        </div>
+        <div class="chat-info">
+          <h3>Testimonios de Malvinas</h3>
+          <p class="chat-status"><span class="status-indicator"></span> Agente IA listo (Sector 2 & 3)</p>
+        </div>
+        <div class="chat-header-actions">
+          <button id="btn-minimize-chat" title="Minimizar chat"><i class="fa-solid fa-minus"></i></button>
+        </div>
+      </div>
+
+      <!-- Selector de Modo de Interacción -->
+      <div class="chat-mode-tabs">
+        <button class="chat-tab active" id="tab-veterano" data-mode="testimonio_veterano">
+          <i class="fa-solid fa-user-shield"></i> Soy Veterano (Contar Historia)
+        </button>
+        <button class="chat-tab" id="tab-consulta" data-mode="consulta_historica">
+          <i class="fa-solid fa-book-bookmark"></i> Consulta Histórica
+        </button>
+      </div>
+
+      <!-- Área de Mensajes -->
+      <div class="chat-messages" id="chat-messages">
+        <!-- Mensaje de bienvenida inicial -->
+        <div class="message-bubble bot-message">
+          <div class="bubble-sender"><i class="fa-solid fa-shield-halved"></i> Guardián de la Memoria</div>
+          <div class="bubble-text">
+            Bienvenido al portal conmemorativo de Malvinas. Si eres veterano o familiar, este espacio está dedicado a preservar tu historia de forma permanente. Si deseas aprender o investigar sobre los hechos de 1982, puedes realizar cualquier consulta histórica.
+          </div>
+          <span class="message-time">Ahora</span>
+        </div>
+      </div>
+
+      <!-- Indicador de "Escribiendo..." -->
+      <div class="chat-typing-indicator" id="chat-typing" style="display: none;">
+        <span></span><span></span><span></span>
+        <small>El agente de IA está procesando...</small>
+      </div>
+
+      <!-- Sugerencias Rápidas / Chips -->
+      <div class="chat-chips-container" id="chat-chips">
+        <button class="chip-btn" data-text="Quiero registrar mi vivencia en las islas">🎖️ Contar mi historia</button>
+        <button class="chip-btn" data-text="¿Qué ocurrió en el combate de Monte Longdon?">📍 Monte Longdon</button>
+        <button class="chip-btn" data-text="¿Cuál fue el rol del Batallón de Infantería de Marina 5?">⚓ BIM 5</button>
+      </div>
+
+      <!-- Formulario de Entrada de Mensaje -->
+      <form class="chat-input-form" id="chat-form">
+        <div class="input-wrapper">
+          <textarea id="chat-input" placeholder="Escribe tu testimonio o consulta histórica..." rows="1" required></textarea>
+        </div>
+        <button type="submit" class="btn-send-message" id="btn-send" title="Enviar mensaje">
+          <i class="fa-solid fa-paper-plane"></i>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Leaflet.js JS (100% Gratuito y Libre) -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <!-- Lógica Principal del Frontend (Sector 1) -->
+  <script src="app.js"></script>
+</body>
+</html>
