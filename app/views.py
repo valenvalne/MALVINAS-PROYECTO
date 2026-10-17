@@ -52,6 +52,10 @@ def get_or_create_active_session(request):
     sync_session_to_sheets(session)
     return session
 
+def portal(request):
+    """Portal web interactivo (Sector 1): mapa, galería y widget de chat conectado a /api/chat/."""
+    return render(request, "portal.html")
+
 def index(request):
     """Vista principal de la Plataforma de Testimonios y Agente Virtual de Malvinas."""
     session = get_or_create_active_session(request)

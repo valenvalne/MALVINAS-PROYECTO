@@ -9,13 +9,13 @@
 // ==================== CONFIGURACIÓN DE RED & ARQUITECTURA (SECTORES 2 Y 3) ====================
 const CONFIG = {
   // Cuando el Sector 3 despliegue la API, simplemente se actualiza esta URL:
-  API_BASE_URL: "http://localhost:3000/api",
+  API_BASE_URL: "/api",
   ENDPOINTS: {
-    CHAT: "/chat",
-    VETERAN_STORY: "/testimonios"
+    CHAT: "/chat/",
+    VETERAN_STORY: "/events/"
   },
   // Modo simulación local activado para probar de inmediato sin depender del backend:
-  USE_MOCK: true
+  USE_MOCK: false
 };
 
 // ==================== BASE DE DATOS CARTOGRÁFICA DE HITOS HISTÓRICOS ====================
@@ -609,6 +609,7 @@ const ChatService = {
       sessionId: "session-" + (sessionStorage.getItem("malvinas_sid") || (sessionStorage.setItem("malvinas_sid", Date.now()), Date.now())),
       tipo: modo,
       mensaje: mensaje,
+      message: mensaje,
       timestamp: new Date().toISOString()
     };
 
@@ -622,7 +623,14 @@ const ChatService = {
       throw new Error("HTTP error " + response.status);
     }
 
-    return await response.json();
+    // Adaptar el contrato del backend Django ({ ok, reply }) al que espera la UI ({ status, respuesta })
+    const data = await response.json();
+    return {
+      ...data,
+      status: data.ok ? "success" : "error",
+      respuesta: data.reply,
+      guardadoEnDB: Boolean(data.ok)
+    };
   },
 
   // Generador de respuestas simuladas para desarrollo local
