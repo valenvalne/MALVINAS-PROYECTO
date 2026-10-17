@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    container_name: malvinas_agente_ia
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+      - ./files_storage:/app/files_storage
+    env_file:
+      - .env
+    environment:
+      - PYTHONUNBUFFERED=1
+      - RUNNING_IN_DOCKER=1

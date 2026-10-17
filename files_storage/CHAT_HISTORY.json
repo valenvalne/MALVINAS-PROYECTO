@@ -1,0 +1,32 @@
+[
+  {
+    "timestamp": "2026-10-17T17:46:39.079858",
+    "role": "user",
+    "content": "Buenas tardes, estuve en Monte Longdon el 11 de junio con el RI 7"
+  },
+  {
+    "timestamp": "2026-10-17T17:46:39.105879",
+    "role": "assistant",
+    "content": "Buenas tardes. Es un verdadero honor recibirlo en este espacio de memoria y homenaje. Queremos agradecerle profundamente su disposición para compartir sus vivencias o las de su familia. Toda la información que desee confiarme será tratada con absoluto respeto para preservar la historia en el territorio de nuestras Islas Malvinas. ¿Le gustaría comenzar contándome en qué unidad sirvió o en qué zona de las islas estuvo destinado?"
+  },
+  {
+    "timestamp": "2026-10-17T17:59:52.679754",
+    "role": "user",
+    "content": "Hola, estuve destinado en Monte Longdon con el Regimiento de Infanteria 7 en junio de 1982"
+  },
+  {
+    "timestamp": "2026-10-17T17:59:52.699081",
+    "role": "assistant",
+    "content": "Buenas tardes. Es un verdadero honor recibirlo en este espacio de memoria y homenaje. Queremos agradecerle profundamente su disposición para compartir sus vivencias o las de su familia. Toda la información que desee confiarme será tratada con absoluto respeto para preservar la historia en el territorio de nuestras Islas Malvinas. ¿Le gustaría comenzar contándome en qué unidad sirvió o en qué zona de las islas estuvo destinado?"
+  },
+  {
+    "timestamp": "2026-10-17T18:02:42.141138",
+    "role": "user",
+    "content": "Soy familiar de un veterano de Malvinas y quiero registrar sus recuerdos."
+  },
+  {
+    "timestamp": "2026-10-17T18:02:42.168877",
+    "role": "assistant",
+    "content": "Le escucho con total atención y respeto. Cada palabra suya es un pedazo vivo de nuestra historia que merece ser preservado. Por favor, continúe explayándose a su propio ritmo sobre lo que sentía o vivía en aquellos días."
+  }
+]

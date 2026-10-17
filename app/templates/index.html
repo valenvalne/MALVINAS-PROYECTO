@@ -1,0 +1,279 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Plataforma de Memoria Histórica de Malvinas | Agente Testimonial</title>
+  <meta name="description" content="Agente virtual empático para la recolección de testimonios históricos de la Guerra de Malvinas y sincronización en tiempo real con Google Sheets.">
+  
+  <!-- Tipografía Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  
+  <!-- Estilos del Sistema -->
+  <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+</head>
+<body class="malvinas-theme">
+  {% csrf_token %}
+
+  <div class="app-container">
+    <!-- BARRA SUPERIOR INSTITUCIONAL -->
+    <header class="main-header">
+      <div class="header-brand">
+        <div class="flag-symbol">
+          <div class="flag-stripe sky"></div>
+          <div class="flag-stripe white"><span class="sun-icon">☀️</span></div>
+          <div class="flag-stripe sky"></div>
+        </div>
+        <div class="brand-titles">
+          <h1 class="brand-title">MEMORIA MALVINAS</h1>
+          <p class="brand-subtitle">AGENTE TESTIMONIAL VIRTUAL & GEORREFERENCIACIÓN</p>
+        </div>
+      </div>
+
+      <div class="header-badges">
+        <!-- Indicador de sincronización con Google Sheets -->
+        <div class="status-pill {% if sheets_status.is_connected %}connected{% else %}local{% endif %}" id="sheetsPill" title="{{ sheets_status.message }}">
+          <span class="pill-dot"></span>
+          <span class="pill-text" id="sheetsPillText">
+            {% if sheets_status.is_connected %}Google Sheets: En Vivo{% else %}Respaldo Local Activo{% endif %}
+          </span>
+        </div>
+
+        <button type="button" class="btn btn-outline-light btn-sm" id="btnEditProfile">
+          👤 Perfil Testimonio
+        </button>
+
+        <button type="button" class="btn btn-outline-danger btn-sm" id="btnResetSession" title="Comenzar una nueva entrevista testimonial">
+          🔄 Nueva Sesión
+        </button>
+      </div>
+    </header>
+
+    <!-- CUERPO PRINCIPAL DIVIDIDO: CHAT + PANEL DE HITOS GEOGRÁFICOS -->
+    <main class="main-content-grid">
+      
+      <!-- SECCIÓN DEL CHAT DE ESCUCHA ACTIVA -->
+      <section class="chat-section">
+        <div class="chat-card">
+          <div class="chat-card-header">
+            <div class="agent-info">
+              <div class="agent-avatar">🇦🇷</div>
+              <div>
+                <h2 class="agent-name">Asistente Testimonial de la Memoria</h2>
+                <span class="agent-status-label">Escucha activa y respetuosa • Diálogo permanente</span>
+              </div>
+            </div>
+            <div class="session-badge">
+              Sesión: <span class="mono-code" id="sessionShortId">{{ session.session_id|stringformat:".8s" }}</span>
+            </div>
+          </div>
+
+          <!-- MENSAJES DEL CHAT -->
+          <div class="chat-messages-container" id="chatMessages">
+            <!-- Mensaje de bienvenida inicial protocolar -->
+            <div class="message-row assistant">
+              <div class="message-avatar">🇦🇷</div>
+              <div class="message-bubble">
+                <div class="message-meta">
+                  <span class="sender-name">Asistente Testimonial</span>
+                  <span class="message-time">Inicio</span>
+                </div>
+                <div class="message-body">
+                  Buenas tardes. Es un verdadero honor recibirlo en este espacio de memoria y homenaje a nuestros héroes de Malvinas.
+                  <br><br>
+                  Queremos agradecerle profundamente su tiempo y generosidad para compartir sus vivencias o las de su ser querido. Toda la información que decida confiarme será tratada con el más solemne respeto y contribuirá a georreferenciar los acontecimientos en el territorio de las islas.
+                  <br><br>
+                  <strong>¿Le gustaría comenzar contándome en qué unidad sirvió o en qué sector de las islas estuvo destinado?</strong>
+                </div>
+              </div>
+            </div>
+
+            {% for msg in messages %}
+            <div class="message-row {{ msg.role }}">
+              <div class="message-avatar">
+                {% if msg.role == 'user' %}👤{% else %}🇦🇷{% endif %}
+              </div>
+              <div class="message-bubble">
+                <div class="message-meta">
+                  <span class="sender-name">{% if msg.role == 'user' %}{{ session.witness.name }}{% else %}Asistente Testimonial{% endif %}</span>
+                  <span class="message-time">{{ msg.timestamp|date:"H:i" }}</span>
+                </div>
+                <div class="message-body">
+                  {{ msg.content|linebreaksbr }}
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+
+          <!-- ATRIBUTOS Y SUGERENCIAS RÁPIDAS DE INICIO -->
+          <div class="quick-prompts-bar">
+            <span class="quick-label">Sugerencias para comenzar:</span>
+            <button type="button" class="quick-btn" data-text="Estuve destinado en Monte Longdon con el Regimiento de Infantería 7.">Monte Longdon (RI 7)</button>
+            <button type="button" class="quick-btn" data-text="Pertenecí al BIM 5 en Monte Tumbledown durante los combates de junio.">Tumbledown (BIM 5)</button>
+            <button type="button" class="quick-btn" data-text="Estuve en la zona de Pradera del Ganso a fines de mayo.">Pradera del Ganso</button>
+            <button type="button" class="quick-btn" data-text="Soy familiar de un veterano de Malvinas y quiero registrar sus recuerdos.">Familiar de Veterano</button>
+          </div>
+
+          <!-- COMPOSITOR DE MENSAJE -->
+          <form class="chat-composer-form" id="chatForm">
+            <div class="composer-wrapper">
+              <textarea 
+                id="chatInput" 
+                class="chat-input" 
+                placeholder="Escriba aquí sus palabras con total tranquilidad y a su propio ritmo..." 
+                rows="2"
+                required
+              ></textarea>
+              <button type="submit" class="btn btn-primary" id="btnSend">
+                <span class="btn-text">Enviar</span>
+                <span class="btn-spinner" style="display:none;">⏳</span>
+              </button>
+            </div>
+            <div class="composer-footnote">
+              🔒 Su testimonio se resguarda automáticamente y se procesa con confidencialidad ética.
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <!-- SECCIÓN LATERAL: HITOS GEOGRÁFICOS EXTRAÍDOS Y MONITOREO DE GOOGLE SHEETS -->
+      <aside class="sidebar-section">
+        
+        <!-- TARJETA: PERFIL DEL ENTREVISTADO -->
+        <div class="side-card">
+          <div class="side-card-header">
+            <h3>👤 Testimoniante</h3>
+            <span class="badge badge-sky" id="witnessRoleBadge">{{ session.witness.role }}</span>
+          </div>
+          <div class="witness-summary">
+            <p><strong>Nombre:</strong> <span id="witnessNameDisplay">{{ session.witness.name }}</span></p>
+            <p><strong>Unidad:</strong> <span id="witnessUnitDisplay">{% if session.witness.unit %}{{ session.witness.unit }}{% else %}No especificada{% endif %}</span></p>
+            <p><strong>Privacidad:</strong> <span id="witnessPrivacyDisplay">{{ session.witness.privacy_level }}</span></p>
+          </div>
+        </div>
+
+        <!-- TARJETA: GOOGLE SHEETS EN TIEMPO REAL -->
+        <div class="side-card sheets-card">
+          <div class="side-card-header">
+            <h3>📊 Google Sheets (Hoja Única)</h3>
+            <button type="button" class="btn-refresh" id="btnSyncSheets" title="Sincronizar ahora con Google Sheets">⟳</button>
+          </div>
+          <div class="sheets-info-box">
+            <div class="info-row">
+              <span class="info-label">Modo:</span>
+              <span class="info-val" id="sheetsModeText">{{ sheets_status.mode }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Spreadsheet ID:</span>
+              <span class="info-val mono-code" id="sheetsIdText">{{ sheets_status.spreadsheet_id|truncatechars:20 }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Pestañas:</span>
+              <span class="info-val"><code>Testimonios</code> y <code>Eventos</code></span>
+            </div>
+          </div>
+          <p class="sheets-note">
+            Cada acontecimiento detectado se anexa en tiempo real en la hoja creada por su compañero.
+          </p>
+        </div>
+
+        <!-- TARJETA: ACONTECIMIENTOS HISTÓRICOS DETECTADOS -->
+        <div class="side-card events-card">
+          <div class="side-card-header">
+            <h3>📍 Acontecimientos en Malvinas (<span id="eventsCount">{{ events|length }}</span>)</h3>
+          </div>
+          <div class="events-scroll-container" id="eventsContainer">
+            {% for ev in events %}
+            <div class="event-card">
+              <div class="event-card-top">
+                <span class="event-place">📍 {{ ev.toponymy }}</span>
+                <span class="event-date">{{ ev.event_date }}</span>
+              </div>
+              <div class="event-coords">
+                Lat: {{ ev.latitude }} • Lng: {{ ev.longitude }}
+              </div>
+              {% if ev.units_involved %}
+              <div class="event-units">
+                🎖️ {{ ev.units_involved }}
+              </div>
+              {% endif %}
+              <div class="event-quote">
+                {{ ev.quote }}
+              </div>
+              <div class="event-status-footer">
+                <span class="badge badge-success">✓ Sincronizado</span>
+              </div>
+            </div>
+            {% empty %}
+            <div class="no-events-placeholder" id="noEventsMsg">
+              A medida que converse sobre lugares o sucesos en las islas, aparecerán aquí georreferenciados para el mapa matriz.
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+
+      </aside>
+
+    </main>
+  </div>
+
+  <!-- MODAL: EDICIÓN DE PERFIL DEL TESTIMONIANTE -->
+  <div class="modal-backdrop" id="profileModal" style="display:none;">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3>Datos del Testimoniante</h3>
+        <button type="button" class="modal-close" id="btnCloseModal">×</button>
+      </div>
+      <form id="profileForm" class="modal-body">
+        <div class="form-group">
+          <label for="inputName">Nombre completo o como desea ser identificado:</label>
+          <input type="text" id="inputName" class="form-input" value="{{ session.witness.name }}">
+        </div>
+
+        <div class="form-group">
+          <label for="selectRole">Condición o Rol:</label>
+          <select id="selectRole" class="form-select">
+            <option value="Veterano de Guerra" {% if session.witness.role == 'Veterano de Guerra' %}selected{% endif %}>Veterano de Guerra de Malvinas</option>
+            <option value="Familiar Directo" {% if session.witness.role == 'Familiar Directo' %}selected{% endif %}>Familiar Directo de Veterano</option>
+            <option value="Personal Sanitario" {% if session.witness.role == 'Personal Sanitario' %}selected{% endif %}>Personal Sanitario / Sanidad</option>
+            <option value="Otro" {% if session.witness.role == 'Otro' %}selected{% endif %}>Otro Testimonio Histórico</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="inputUnit">Fuerza, Regimiento o Unidad (Ej: RI Mec 7, BIM 5, Fuerza Aérea):</label>
+          <input type="text" id="inputUnit" class="form-input" value="{{ session.witness.unit }}" placeholder="Ej: Ejército Argentino - RI 7">
+        </div>
+
+        <div class="form-group">
+          <label for="selectPrivacy">Nivel de Privacidad deseado:</label>
+          <select id="selectPrivacy" class="form-select">
+            <option value="Nombre Público" {% if session.witness.privacy_level == 'Nombre Público' %}selected{% endif %}>Nombre Público (Divulgar con orgullo su nombre)</option>
+            <option value="Solo Iniciales" {% if session.witness.privacy_level == 'Solo Iniciales' %}selected{% endif %}>Solo Iniciales</option>
+            <option value="Anónimo" {% if session.witness.privacy_level == 'Anónimo' %}selected{% endif %}>Anónimo</option>
+          </select>
+        </div>
+
+        <div class="form-group-checkbox">
+          <label>
+            <input type="checkbox" id="checkConsent" {% if session.witness.consent_given %}checked{% endif %}>
+            Autorizo que los acontecimientos y relatos brindados se utilicen para la memoria pública en la web matriz y mapa de Malvinas.
+          </label>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="btnCancelModal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Lógica JavaScript del Chat -->
+  <script src="{% static 'js/chat.js' %}"></script>
+</body>
+</html>
