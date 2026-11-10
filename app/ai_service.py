@@ -15,14 +15,22 @@ def generate_local_empathetic_reply(message: str, history_messages: list, witnes
     msg_norm = normalize(message)
     turns_count = len(history_messages)
 
+    # Detección de preguntas históricas en el espacio de veteranos
+    is_question = any(q in msg_norm for q in ["?", "¿", "que paso", "cuando fue", "donde fue", "quien fue", "como fue", "por que", "cuantos murieron", "contame sobre", "que sabes de"])
+    if is_question:
+        return (
+            "Este espacio está reservado para que los veteranos de guerra y sus familias puedan registrar sus testimonios y vivencias personales. "
+            "Si desea realizar preguntas históricas sobre el desarrollo del conflicto de 1982, puede cambiar a la pestaña 'Consulta Histórica'. "
+            "Si usted desea dejar registrado su testimonio aquí en la Hoja de Cálculo oficial, con absoluto honor le escuchamos: ¿cuál es su Nombre y Apellido?"
+        )
+
     # Detección de saludos iniciales
     if any(w in msg_norm for w in ["hola", "buen dia", "buenas tardes", "buenas noches", "saludos"]):
         if turns_count <= 2:
             return (
                 "Buenas tardes. Es un verdadero honor recibirlo en este espacio de memoria y homenaje. "
-                "Queremos agradecerle profundamente su disposición para compartir sus vivencias o las de su familia. "
-                "Toda la información que desee confiarme será tratada con absoluto respeto para preservar la historia en el territorio de nuestras Islas Malvinas. "
-                "¿Le gustaría comenzar contándome en qué unidad sirvió o en qué zona de las islas estuvo destinado?"
+                "Aquí recopilamos los testimonios para su preservación permanente en la Hoja de Cálculo oficial de Google Drive. "
+                "Para iniciar su registro, por favor indíquenos su Nombre y Apellido, y si es Veterano de Guerra o Familiar:"
             )
 
     # Detección de cansancio, dolor o necesidad de pausa

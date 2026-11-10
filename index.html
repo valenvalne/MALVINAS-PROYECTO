@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Portal interactivo conmemorativo de la Guerra de Malvinas de 1982. Exploración cartográfica por escalas, testimonios de veteranos e inteligencia artificial para la preservación de la memoria.">
-  <title>Malvinas 1982 | Memoria, Territorio y Testimonios</title>
+  <meta name="description" content="Portal interactivo y Auto-Guía Cronológica Día por Día de la Guerra de Malvinas de 1982 (19 de marzo al 15 de junio). Exploración cartográfica en 4 escalas, expedientes históricos y testimonios de veteranos.">
+  <title>Malvinas 1982 | Auto-Guía Cronológica, Territorio y Testimonios</title>
 
-  <!-- Google Fonts: Cinzel para títulos conmemorativos e Inter para la interfaz moderna -->
+  <!-- Google Fonts: Cinzel para títulos conmemorativos, Inter para lectura clara y JetBrains Mono para telemetría cartográfica -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 
   <!-- Leaflet.js CSS (100% Gratuito y Libre) -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
@@ -31,7 +31,7 @@
         </div>
         <div class="brand-text">
           <h1>MALVINAS 1982</h1>
-          <p class="subtitle">Memoria Viva, Territorio y Testimonios de Veteranos</p>
+          <p class="subtitle">Auto-Guía Cronológica Día por Día (19 Mar – 15 Jun) y Testimonios</p>
         </div>
       </div>
 
@@ -39,20 +39,11 @@
         <span class="badge badge-flag">
           <span class="flag-dot"></span> Soberanía Histórica
         </span>
-        <span class="badge badge-pulse">
-          <i class="fa-solid fa-satellite"></i> Leaflet Satelital Activo
-        </span>
       </div>
 
       <nav class="header-controls">
-        <button id="btn-reset-map" class="btn btn-secondary" title="Centrar vista en las Islas Malvinas">
-          <i class="fa-solid fa-arrows-to-dot"></i> Vista General
-        </button>
-        <button id="btn-toggle-info" class="btn btn-secondary" title="Ver información del proyecto">
-          <i class="fa-solid fa-circle-info"></i> Proyecto
-        </button>
-        <button id="btn-open-chat-header" class="btn btn-primary" title="Abrir espacio de testimonios y consultas">
-          <i class="fa-solid fa-comment-dots"></i> Testimonios & Chat
+        <button id="btn-reset-map" class="btn btn-secondary" title="Centrar vista general en el Atlántico Sur y las Islas Malvinas">
+          <i class="fa-solid fa-arrows-to-dot"></i> <span>Vista General</span>
         </button>
       </nav>
     </div>
@@ -63,25 +54,53 @@
     <!-- Contenedor del Mapa Leaflet -->
     <div id="map" class="interactive-map"></div>
 
-    <!-- Barra Superior de Control de Escalas y Capas Flotante -->
+    <!-- Panel Superior Izquierdo: Selector de las 4 Escalas Cartográficas -->
     <div class="map-floating-overlay top-left">
       <div class="scale-selector-card glass-panel">
         <div class="scale-header">
           <i class="fa-solid fa-layer-group"></i>
-          <span>Nivel de Escala</span>
+          <span>Nivel de Escala (1 a 4)</span>
         </div>
         <div class="scale-buttons" id="scale-buttons">
-          <button class="scale-btn active" data-zoom="8" data-lat="-51.75" data-lng="-59.10">
-            <strong>Escala 1</strong>
-            <small>Archipiélago Completo</small>
+          <button class="scale-btn active" data-scale="1" data-zoom="8" data-lat="-51.75" data-lng="-59.10">
+            <strong>Escala 1 <span class="scale-zoom-tag">Z ≤ 8</span></strong>
+            <small>Atlántico Sur / Archipiélago</small>
           </button>
-          <button class="scale-btn" data-zoom="10" data-lat="-51.70" data-lng="-58.50">
-            <strong>Escala 2</strong>
-            <small>Isla Soledad / San Carlos</small>
+          <button class="scale-btn" data-scale="2" data-zoom="10" data-lat="-51.70" data-lng="-59.00">
+            <strong>Escala 2 <span class="scale-zoom-tag">Z 9–11</span></strong>
+            <small>Isla Soledad / Gran Malvina</small>
           </button>
-          <button class="scale-btn" data-zoom="13" data-lat="-51.692" data-lng="-57.858">
-            <strong>Escala 3</strong>
-            <small>Puerto Argentino / Montes</small>
+          <button class="scale-btn" data-scale="3" data-zoom="13" data-lat="-51.692" data-lng="-57.930">
+            <strong>Escala 3 <span class="scale-zoom-tag">Z 12–14</span></strong>
+            <small>Frentes de Batalla / Montes</small>
+          </button>
+          <button class="scale-btn" data-scale="4" data-zoom="16" data-lat="-51.6935" data-lng="-57.8595">
+            <strong>Escala 4 <span class="scale-zoom-tag">Z 15–18</span></strong>
+            <small>Posiciones Tácticas / Detalle Micro</small>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Panel Superior Central: Filtro por Mes -->
+    <div class="map-floating-overlay top-center" id="chronology-guide-panel">
+      <div class="chronology-guide-card glass-panel">
+        <!-- Filtro por Meses del Conflicto (Marzo a Junio 1982) -->
+        <div class="month-filter-bar" id="month-filter-bar" role="tablist" aria-label="Filtrar hechos históricos por mes">
+          <button type="button" class="month-filter-btn active" data-month="escala" id="btn-filter-escala" title="Mostrar hitos automáticamente según el nivel de zoom (Escalas 1 a 4)">
+            <i class="fa-solid fa-magnifying-glass-location"></i> Ver Todo por Escala
+          </button>
+          <button type="button" class="month-filter-btn month-marzo" data-month="marzo" title="Ver todos los hechos de Marzo de 1982">
+            <span class="month-dot"></span> Marzo 1982
+          </button>
+          <button type="button" class="month-filter-btn month-abril" data-month="abril" title="Ver todos los hechos de Abril de 1982">
+            <span class="month-dot"></span> Abril 1982
+          </button>
+          <button type="button" class="month-filter-btn month-mayo" data-month="mayo" title="Ver todos los hechos de Mayo de 1982">
+            <span class="month-dot"></span> Mayo 1982
+          </button>
+          <button type="button" class="month-filter-btn month-junio" data-month="junio" title="Ver todos los hechos de Junio de 1982">
+            <span class="month-dot"></span> Junio 1982
           </button>
         </div>
       </div>
@@ -95,12 +114,12 @@
       </div>
     </div>
 
-    <!-- ==================== CINTA INFERIOR DE EXPLORACIÓN FOTOGRÁFICA (Como Google Maps) ==================== -->
+    <!-- ==================== CINTA INFERIOR DE EXPLORACIÓN FOTOGRÁFICA ==================== -->
     <section class="photo-exploration-strip glass-panel" id="photo-strip" aria-label="Exploración fotográfica de hitos históricos">
       <div class="strip-header">
         <div class="strip-title">
           <i class="fa-solid fa-camera-retro"></i>
-          <span>Explorar Hitos y Puntos Históricos</span>
+          <span id="strip-mode-title">Explorar Hitos y Puntos Históricos</span>
           <span class="badge-count" id="points-count">0 puntos</span>
         </div>
         <div class="strip-actions">
@@ -120,77 +139,129 @@
     </section>
   </main>
 
-  <!-- ==================== MODAL DE INFORMACIÓN HISTÓRICA DETALLADA ==================== -->
+  <!-- ==================== MODAL DOCUMENTAL DE EXPEDIENTE HISTÓRICO ==================== -->
   <div class="modal-backdrop" id="modal-backdrop">
-    <div class="detail-modal glass-panel" id="detail-modal">
+    <div class="detail-modal glass-panel" id="detail-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
       <button class="modal-close" id="modal-close-btn" aria-label="Cerrar ventana"><i class="fa-solid fa-xmark"></i></button>
-      <div class="modal-image-container">
-        <img id="modal-image" src="" alt="Fotografía histórica">
-        <div class="modal-badge-container">
-          <span class="modal-tag" id="modal-tag">Zona Histórica</span>
+
+      <!-- Visor Fotográfico / Carrusel Documental -->
+      <div class="modal-gallery-wrapper">
+        <div class="modal-image-container" id="modal-image-container">
+          <img id="modal-image" src="" alt="Fotografía histórica del hito" title="Haz clic para ampliar a pantalla completa">
+
+          <!-- Controles de Navegación del Carrusel -->
+          <button type="button" class="carousel-nav-btn prev" id="modal-prev-img" aria-label="Fotografía anterior" title="Fotografía anterior">
+            <i class="fa-solid fa-chevron-left"></i>
+          </button>
+          <button type="button" class="carousel-nav-btn next" id="modal-next-img" aria-label="Fotografía siguiente" title="Fotografía siguiente">
+            <i class="fa-solid fa-chevron-right"></i>
+          </button>
+
+          <!-- Botón de Ampliación a Pantalla Completa y Contador -->
+          <div class="modal-gallery-top-bar">
+            <span class="modal-gallery-counter" id="modal-gallery-counter">Foto 1 de 3</span>
+            <button type="button" class="btn-expand-photo" id="btn-expand-photo" title="Ver fotografía en tamaño completo">
+              <i class="fa-solid fa-expand"></i> Ampliar foto
+            </button>
+          </div>
+
+          <!-- Etiqueta de Operación y Pie de Foto -->
+          <div class="modal-badge-container">
+            <span class="modal-tag" id="modal-tag">Zona Histórica</span>
+            <p class="modal-image-caption" id="modal-image-caption">Registro fotográfico del sector histórico.</p>
+          </div>
+        </div>
+
+        <!-- Tira de Miniaturas Interactivas -->
+        <div class="modal-thumbnails-strip" id="modal-thumbnails">
+          <!-- Miniaturas generadas dinámicamente en app.js -->
         </div>
       </div>
+
+      <!-- Cuerpo del Expediente Histórico -->
       <div class="modal-body">
-        <h2 id="modal-title">Título del Hito</h2>
-        <p class="modal-date" id="modal-date"><i class="fa-regular fa-calendar"></i> Fecha clave: 1982</p>
-        <div class="modal-description" id="modal-description">
-          Descripción detallada del combate, el regimiento involucrado y su significado histórico.
+        <div class="modal-header-info">
+          <span class="dossier-kicker"><i class="fa-solid fa-file-shield"></i> Expediente Histórico Conmemorativo &bull; Malvinas 1982</span>
+          <h2 id="modal-title">Título del Hito</h2>
+          <p class="modal-date" id="modal-date"><i class="fa-regular fa-calendar"></i> Fecha clave: 1982</p>
         </div>
+
+        <!-- Grilla de Ficha Táctica -->
+        <div class="tactical-sheet-grid" id="modal-tactical-sheet">
+          <div class="tactical-card">
+            <div class="tactical-card-header">
+              <i class="fa-solid fa-shield-halved"></i>
+              <span>Unidades Argentinas</span>
+            </div>
+            <p id="modal-tactical-units">—</p>
+          </div>
+
+          <div class="tactical-card">
+            <div class="tactical-card-header">
+              <i class="fa-solid fa-crosshairs"></i>
+              <span>Operación, Fecha y Escala</span>
+            </div>
+            <p id="modal-tactical-operation">—</p>
+          </div>
+
+          <div class="tactical-card">
+            <div class="tactical-card-header">
+              <i class="fa-solid fa-mountain-sun"></i>
+              <span>Terreno y Clima Austral</span>
+            </div>
+            <p id="modal-tactical-terrain">—</p>
+          </div>
+        </div>
+
+        <!-- Área de Lectura Estructurada por Secciones -->
+        <div class="modal-description" id="modal-description">
+          <section class="dossier-section">
+            <h3><i class="fa-solid fa-book-open"></i> Contexto Previo y Desarrollo del Hecho Histórico</h3>
+            <div id="modal-section-historia" class="dossier-text-content"></div>
+          </section>
+
+          <section class="dossier-section">
+            <h3><i class="fa-solid fa-users-gear"></i> Fuerzas y Unidades Argentinas Intervinientes</h3>
+            <div id="modal-section-unidades" class="dossier-text-content"></div>
+          </section>
+
+          <section class="dossier-section">
+            <h3><i class="fa-solid fa-medal"></i> Héroes Destacados, Consecuencias y Legado</h3>
+            <div id="modal-section-legado" class="dossier-text-content"></div>
+          </section>
+        </div>
+
         <div class="modal-footer-actions">
+          <!-- Botón de enlace externo a YouTube (Se muestra automáticamente si el punto tiene videoUrl configurado en app.js) -->
+          <a href="#" target="_blank" rel="noopener noreferrer" class="btn btn-youtube" id="btn-youtube-modal" style="display: none;" title="Abrir el relato documental en YouTube en el minuto y segundo exacto">
+            <i class="fa-brands fa-youtube"></i>
+            <span>Ver relato detallado en YouTube</span>
+          </a>
+
           <button class="btn btn-secondary" id="btn-fly-to-point">
-            <i class="fa-solid fa-location-crosshairs"></i> Enfocar en Mapa
+            <i class="fa-solid fa-location-crosshairs"></i> Enfocar Posición en el Mapa
           </button>
           <button class="btn btn-primary" id="btn-story-about-this">
-            <i class="fa-solid fa-feather-pointed"></i> Dejar o Consultar Testimonio sobre este lugar
+            <i class="fa-solid fa-feather-pointed"></i> Dejar o Consultar Testimonio sobre este hecho
           </button>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- ==================== MODAL INFORMATIVO DEL PROYECTO (SECTORES 1, 2 Y 3) ==================== -->
-  <div class="modal-backdrop" id="info-modal-backdrop">
-    <div class="detail-modal glass-panel info-project-modal">
-      <button class="modal-close" id="info-modal-close-btn" aria-label="Cerrar"><i class="fa-solid fa-xmark"></i></button>
-      <div class="modal-body">
-        <h2>Proyecto Académico: Malvinas 1982</h2>
-        <p class="lead-text">Plataforma interactiva para la divulgación histórica y el rescate de la memoria viva.</p>
-        
-        <div class="sectors-grid">
-          <div class="sector-card active-sector">
-            <div class="sector-icon"><i class="fa-solid fa-laptop-code"></i></div>
-            <h3>Sector 1 (Frontend UI/UX)</h3>
-            <p>Mapa satelital libre (Leaflet.js), galería de fotos sincronizada y widget conversacional.</p>
-            <span class="sector-status">Módulo Actual</span>
-          </div>
-
-          <div class="sector-card">
-            <div class="sector-icon"><i class="fa-solid fa-brain"></i></div>
-            <h3>Sector 2 (Agente IA)</h3>
-            <p>Procesamiento de lenguaje natural y recopilación respetuosa de historias de veteranos.</p>
-            <span class="sector-status">En Desarrollo</span>
-          </div>
-
-          <div class="sector-card">
-            <div class="sector-icon"><i class="fa-solid fa-server"></i></div>
-            <h3>Sector 3 (API & Base de Datos)</h3>
-            <p>Persistencia segura de testimonios, gestión de sesiones y almacenamiento histórico.</p>
-            <span class="sector-status">En Desarrollo</span>
-          </div>
-        </div>
-
-        <div class="modal-footer-actions">
-          <button class="btn btn-primary" id="btn-close-project-info">Entendido</button>
-        </div>
-      </div>
-    </div>
+  <!-- Visor Lightbox de Imagen a Tamaño Completo -->
+  <div class="lightbox-backdrop" id="image-lightbox" aria-hidden="true">
+    <button type="button" class="lightbox-close" id="lightbox-close-btn" aria-label="Cerrar imagen ampliada">
+      <i class="fa-solid fa-xmark"></i>
+    </button>
+    <img id="lightbox-img" src="" alt="Fotografía histórica en tamaño completo">
+    <p id="lightbox-caption" class="lightbox-caption"></p>
   </div>
 
   <!-- ==================== WIDGET DE CHATBOT (BURBUJA FLOTANTE) ==================== -->
   <div class="chatbot-widget-container" id="chatbot-container">
     <!-- Botón Burbuja Flotante -->
     <button class="chat-bubble-button" id="chat-toggle-button" aria-label="Abrir asistente de testimonios y consultas">
-      <div class="bubble-pulse-ring"></div>
       <i class="fa-solid fa-comment-dots icon-open"></i>
       <i class="fa-solid fa-xmark icon-close"></i>
       <span class="bubble-notification-dot"></span>
@@ -201,11 +272,11 @@
       <!-- Encabezado del Chat -->
       <div class="chat-header">
         <div class="chat-avatar">
-          <i class="fa-solid fa-flag"></i>
+          <i class="fa-solid fa-comment-dots"></i>
         </div>
         <div class="chat-info">
-          <h3>Testimonios de Malvinas</h3>
-          <p class="chat-status"><span class="status-indicator"></span> Agente IA listo (Sector 2 & 3)</p>
+          <h3>Asistente de Memoria</h3>
+          <p class="chat-status"><span class="status-indicator"></span> En línea</p>
         </div>
         <div class="chat-header-actions">
           <button id="btn-minimize-chat" title="Minimizar chat"><i class="fa-solid fa-minus"></i></button>
@@ -213,11 +284,11 @@
       </div>
 
       <!-- Selector de Modo de Interacción -->
-      <div class="chat-mode-tabs">
-        <button class="chat-tab active" id="tab-veterano" data-mode="testimonio_veterano">
-          <i class="fa-solid fa-user-shield"></i> Soy Veterano (Contar Historia)
+      <div class="chat-mode-tabs" role="tablist">
+        <button class="chat-tab active" id="tab-veterano" data-mode="testimonio_veterano" role="tab">
+          <i class="fa-solid fa-user-shield"></i> Soy Veterano
         </button>
-        <button class="chat-tab" id="tab-consulta" data-mode="consulta_historica">
+        <button class="chat-tab" id="tab-consulta" data-mode="consulta_historica" role="tab">
           <i class="fa-solid fa-book-bookmark"></i> Consulta Histórica
         </button>
       </div>
@@ -226,9 +297,8 @@
       <div class="chat-messages" id="chat-messages">
         <!-- Mensaje de bienvenida inicial -->
         <div class="message-bubble bot-message">
-          <div class="bubble-sender"><i class="fa-solid fa-shield-halved"></i> Guardián de la Memoria</div>
           <div class="bubble-text">
-            Bienvenido al portal conmemorativo de Malvinas. Si eres veterano o familiar, este espacio está dedicado a preservar tu historia de forma permanente. Si deseas aprender o investigar sobre los hechos de 1982, puedes realizar cualquier consulta histórica.
+            Hola. Soy el asistente virtual del portal de Malvinas. ¿En qué puedo ayudarte hoy sobre la historia o los registros de los veteranos?
           </div>
           <span class="message-time">Ahora</span>
         </div>
@@ -237,20 +307,23 @@
       <!-- Indicador de "Escribiendo..." -->
       <div class="chat-typing-indicator" id="chat-typing" style="display: none;">
         <span></span><span></span><span></span>
-        <small>El agente de IA está procesando...</small>
+        <small>Escribiendo...</small>
       </div>
 
       <!-- Sugerencias Rápidas / Chips -->
       <div class="chat-chips-container" id="chat-chips">
-        <button class="chip-btn" data-text="Quiero registrar mi vivencia en las islas">🎖️ Contar mi historia</button>
-        <button class="chip-btn" data-text="¿Qué ocurrió en el combate de Monte Longdon?">📍 Monte Longdon</button>
-        <button class="chip-btn" data-text="¿Cuál fue el rol del Batallón de Infantería de Marina 5?">⚓ BIM 5</button>
+        <button class="chip-btn" data-text="Quiero registrar mi vivencia">Registrar vivencia</button>
+        <button class="chip-btn" data-text="¿Qué ocurrió en el Crucero General Belgrano?">Crucero Belgrano</button>
+        <button class="chip-btn" data-text="¿Qué ocurrió el 2 de abril en la Operación Rosario?">2 de Abril</button>
+        <button class="chip-btn" data-text="¿Qué ocurrió en el combate de Monte Longdon?">Monte Longdon</button>
+        <button class="chip-btn" data-text="¿Cómo fue la batalla de Pradera del Ganso y Darwin?">Pradera del Ganso</button>
+        <button class="chip-btn" data-text="¿Qué pasó en el combate de Monte Tumbledown?">Monte Tumbledown</button>
       </div>
 
       <!-- Formulario de Entrada de Mensaje -->
       <form class="chat-input-form" id="chat-form">
         <div class="input-wrapper">
-          <textarea id="chat-input" placeholder="Escribe tu testimonio o consulta histórica..." rows="1" required></textarea>
+          <textarea id="chat-input" placeholder="Escribe tu testimonio o consulta..." rows="1" required></textarea>
         </div>
         <button type="submit" class="btn-send-message" id="btn-send" title="Enviar mensaje">
           <i class="fa-solid fa-paper-plane"></i>

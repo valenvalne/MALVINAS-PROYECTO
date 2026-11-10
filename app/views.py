@@ -81,11 +81,25 @@ def chat_api(request):
     except Exception:
         return JsonResponse({"error": "Formato JSON inválido."}, status=400)
 
-    message_text = (data.get("message") or "").strip()
+    message_text = (data.get("message") or data.get("mensaje") or "").strip()
     if not message_text:
         return JsonResponse({"error": "El mensaje no puede estar vacío."}, status=400)
 
     session = get_or_create_active_session(request)
+
+    # Actualizar datos de perfil del veterano/familiar si se proporcionan
+    witness = session.witness
+    new_name = (data.get("name") or data.get("witness_name") or "").strip()
+    new_role = (data.get("role") or data.get("witness_role") or "").strip()
+    new_unit = (data.get("units") or data.get("unit") or "").strip()
+
+    if new_name and new_name != "Veterano / Testimoniante":
+        witness.name = new_name
+    if new_role:
+        witness.role = new_role
+    if new_unit:
+        witness.unit = new_unit
+    witness.save()
 
     # 1. Registrar mensaje del usuario
     user_msg = ChatMessage.objects.create(
