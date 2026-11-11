@@ -7,7 +7,7 @@ import os
 import sys
 
 PORT = 8000
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AQ.Ab8RN6Loq-X8PdxXrdVU00wjWNOPSwBFzfqv0-PRcFfS5Py_Tw")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 GEMINI_MODEL = "gemini-2.5-flash"
 
 SYSTEM_INSTRUCTION = """Eres un asistente virtual interactivo especializado en la Guerra de Malvinas (1982), historiográfico y con profunda empatía hacia los veteranos de guerra y sus familiares.
