@@ -3590,8 +3590,8 @@ const ChatService = {
       const respuestaTexto = data.respuesta || "No se recibió respuesta del modelo.";
 
       // Guardar en el historial conversacional
-      geminiChatHistory.push({ role: "user", parts: [{ text: text }] });
-      geminiChatHistory.push({ role: "model", parts: [{ text: respuestaTexto }] });
+      geminiChatHistory.push({ role: "user", content: text, parts: [{ text: text }] });
+      geminiChatHistory.push({ role: "assistant", content: respuestaTexto, parts: [{ text: respuestaTexto }] });
 
       if (geminiChatHistory.length > 20) {
         geminiChatHistory = geminiChatHistory.slice(-20);

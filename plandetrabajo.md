@@ -191,7 +191,7 @@ plandetrabajo/
 ├── plandetrabajo.md               # Plan de trabajo formalizado y especificación del proyecto
 ├── image.png                      # Referencia visual de la interfaz de navegación por mapa y fotos
 │
-├── imagenesdeescala/              # Galería de imágenes históricas y puntos georreferenciados
+├── imagenesdeescala/              # Galería de imágenes históricas reales y puntos georreferenciados
 │   ├── puerto_argentino.jpg
 │   ├── monte_longdon.jpg
 │   ├── pradera_del_ganso.jpg
