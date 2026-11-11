@@ -16,9 +16,19 @@
  * ============================================================================
  */
 
+// ==================== 1. INTEGRACIÓN CON BACKEND LOCAL PYTHON (GEMINI) ====================
+// Historial conversacional en memoria activa (mantiene contexto conversacional)
+let geminiChatHistory = [];
+
+/**
+ * Restablece la memoria conversacional activa de Gemini.
+ */
+function resetGeminiChatSession() {
+  geminiChatHistory = [];
+}
+
 // ==================== CONFIGURACIÓN GLOBAL Y ENDPOINTS ====================
 const CONFIG = {
-  USE_MOCK: true,
   API_BASE_URL: "http://localhost:8000",
   ENDPOINTS: {
     CHAT: "/api/chat",
@@ -3039,23 +3049,84 @@ window.openDetailModal = function (pointId) {
 // ==================== 7. WIDGET DE CHATBOT (BURBUJA FLOTANTE) ====================
 // ==================== 7. WIDGET DE CHATBOT (BURBUJA FLOTANTE) ====================
 
-// Estado del Wizard para la solapa "Soy Veterano / Familiar"
-const testimonioWizard = {
-  step: "ESPERANDO_NOMBRE", // "ESPERANDO_NOMBRE", "ESPERANDO_ROL", "ESPERANDO_RELATO", "COMPLETADO"
-  data: {
-    nombre: "",
-    rol: "", // "Veterano de Guerra" o "Familiar"
-    relato: "",
-    unidades: [],
-    lugares: []
+// Memoria Conversacional Inteligente y Persistente
+const testimonioMemory = {
+  nombre: "",
+  rol: "", // "Veterano de Guerra" | "Familiar de Veterano"
+  unidades: [],
+  lugares: [],
+  fechas: [],
+  relatos: [],
+  turnos: 0,
+
+  init() {
+    try {
+      const saved = JSON.parse(localStorage.getItem("malvinas_testimonio_activo") || "null");
+      if (saved && typeof saved === "object" && saved.nombre && saved.nombre !== "Julio") {
+        this.nombre = saved.nombre || "";
+        this.rol = saved.rol || "";
+        this.unidades = Array.isArray(saved.unidades) ? saved.unidades : [];
+        this.lugares = Array.isArray(saved.lugares) ? saved.lugares : [];
+        this.fechas = Array.isArray(saved.fechas) ? saved.fechas : [];
+        this.relatos = Array.isArray(saved.relatos) ? saved.relatos : [];
+        this.turnos = typeof saved.turnos === "number" ? saved.turnos : 0;
+      } else {
+        this.reset();
+      }
+    } catch (e) {
+      console.warn("Memoria local inicial:", e);
+    }
   },
+
+  save() {
+    try {
+      const state = {
+        nombre: this.nombre,
+        rol: this.rol,
+        unidades: this.unidades,
+        lugares: this.lugares,
+        fechas: this.fechas,
+        relatos: this.relatos,
+        turnos: this.turnos,
+        ultimaActualizacion: new Date().toISOString()
+      };
+      localStorage.setItem("malvinas_testimonio_activo", JSON.stringify(state));
+    } catch (e) {
+      console.warn("Error guardando memoria local:", e);
+    }
+  },
+
   reset() {
-    this.step = "ESPERANDO_NOMBRE";
-    this.data = { nombre: "", rol: "", relato: "", unidades: [], lugares: [] };
+    this.nombre = "";
+    this.rol = "";
+    this.unidades = [];
+    this.lugares = [];
+    this.fechas = [];
+    this.relatos = [];
+    this.turnos = 0;
+    try {
+      localStorage.removeItem("malvinas_testimonio_activo");
+    } catch (e) { }
   }
 };
+testimonioMemory.init();
 
-// Detección de preguntas en la solapa de veterano
+// Objeto de compatibilidad por si algún componente legacy consulta testimonioWizard
+const testimonioWizard = {
+  get step() { return testimonioMemory.nombre ? "ESPERANDO_RELATO" : "ESPERANDO_NOMBRE"; },
+  get data() {
+    return {
+      nombre: testimonioMemory.nombre,
+      rol: testimonioMemory.rol,
+      relato: testimonioMemory.relatos.join("\n\n"),
+      unidades: testimonioMemory.unidades,
+      lugares: testimonioMemory.lugares
+    };
+  },
+  reset() { testimonioMemory.reset(); }
+};
+
+// Detección de preguntas históricas
 function isHistoricalQuestion(str) {
   if (!str) return false;
   const clean = str.toLowerCase().trim();
@@ -3076,12 +3147,63 @@ function isHistoricalQuestion(str) {
   return questionTriggers.some(t => clean.startsWith(t) || clean.includes(" " + t) || clean.includes(t + " "));
 }
 
-// Detección de saludos iniciales
-function isGreeting(str) {
+// Detección de saludo exclusivo (mensajes cortos que son meramente un saludo)
+function isGreetingOnly(str) {
   if (!str) return false;
   const clean = str.toLowerCase().trim();
-  const greetings = ["hola", "buenas", "buen dia", "buenos dias", "buenas tardes", "buenas noches", "saludos", "hola que tal", "hola bot"];
+  const words = clean.split(/\s+/);
+  if (words.length > 5) return false;
+  const greetings = ["hola", "buenas", "buen dia", "buenos dias", "buenas tardes", "buenas noches", "saludos", "hola que tal", "hola bot", "hola buenas"];
   return greetings.some(g => clean === g || clean.startsWith(g + " ") || clean.startsWith(g + ","));
+}
+
+function isGreeting(str) {
+  return isGreetingOnly(str);
+}
+
+// Extracción inteligente de nombre propio
+function extractNameFromText(text, currentName) {
+  if (!text) return currentName || "";
+
+  // 1. Detección explícita prioritaria (ej: "me llamo gonzalo", "mi nombre es Juan Perez", "soy Alberto")
+  const explicitMatch = text.match(/(?:me\s+llamo|mi\s+nombre\s+es|soy(?:\s+el)?(?:\s+soldado)?(?:\s+conscripto)?|yo\s+soy|firmado|atte:?|nombre:?)\s+([a-záéíóúñA-ZÁÉÍÓÚÑ]+(?:\s+[a-záéíóúñA-ZÁÉÍÓÚÑ]+){0,3})/i);
+  if (explicitMatch) {
+    let cand = explicitMatch[1].trim();
+    cand = cand.replace(/\b(veterano|familiar|soldado|conscripto|del|de|el|la|en|y|un|con|que|estuve|fui)\b.*$/i, "").trim();
+    const parts = cand.split(/\s+/).filter(w => w.length >= 1);
+    if (parts.length >= 1 && parts.length <= 4 && cand.length >= 2) {
+      return parts.map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
+    }
+  }
+
+  // 2. Si ya teníamos un nombre y el usuario no indicó explícitamente otro, conservarlo
+  if (currentName) return currentName;
+
+  // 3. Detección implícita si solo envía el nombre (ej: cuando el bot le pregunta su nombre y responde "Gonzalo García")
+  const clean = text.trim();
+  const words = clean.split(/\s+/);
+  if (words.length >= 1 && words.length <= 3 && !clean.includes("?") && !clean.includes("¿") && !isHistoricalQuestion(clean) && !isGreetingOnly(clean)) {
+    const isStopWord = words.some(w => ["estuve", "fuimos", "combate", "guerra", "malvinas", "regimiento", "monte", "isla", "barco", "noche", "junio", "abril", "mayo", "hola", "buenas", "gracias"].includes(w.toLowerCase()));
+    if (!isStopWord && clean.length >= 3) {
+      return words.map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
+    }
+  }
+  return "";
+}
+
+// Extracción inteligente de rol (Veterano o Familiar)
+function extractRoleFromText(text, currentRole) {
+  if (!text) return currentRole || "";
+  const lower = text.toLowerCase();
+
+  // Detección explícita de rol
+  if (/\b(familiar|hijo|hija|esposa|viuda|hermano|hermana|padre|madre|nieto|nieta|sobrino|mi\s+pap[aá]|mi\s+padre|mi\s+t[ií]o)\b/i.test(lower)) {
+    return "Familiar de Veterano";
+  }
+  if (/\b(veterano|vgm|excombatiente|soldado|conscripto|marinero|piloto|cabo|sargento|suboficial|oficial|teniente|capit[aá]n|tirador|combat[ií]|serv[ií]|nuestro\s+pozo|mi\s+trinchera|mi\s+secci[oó]n|estuve\s+destinado)\b/i.test(lower)) {
+    return "Veterano de Guerra";
+  }
+  return currentRole || "";
 }
 
 // Extracción de lugares y coordenadas de Malvinas
@@ -3094,6 +3216,7 @@ const TOPONIMOS_MALVINAS = [
   { nombre: "Sapper Hill", alias: ["sapper hill", "colina zapador", "sapper"], lat: -51.705, lng: -57.875 },
   { nombre: "Monte Williams", alias: ["monte williams", "williams"], lat: -51.712, lng: -57.910 },
   { nombre: "Puerto Argentino", alias: ["puerto argentino", "stanley", "puerto stanley", "capital"], lat: -51.692, lng: -57.859 },
+  { nombre: "Base Aérea Militar Malvinas", alias: ["bam malvinas", "aeropuerto", "pista de puerto argentino"], lat: -51.678, lng: -57.778 },
   { nombre: "Pradera del Ganso", alias: ["pradera del ganso", "goose green", "ganso verde"], lat: -51.828, lng: -58.972 },
   { nombre: "Darwin", alias: ["darwin", "istmo de darwin"], lat: -51.815, lng: -58.950 },
   { nombre: "Bahía San Carlos", alias: ["san carlos", "bahia san carlos", "estrecho de san carlos"], lat: -51.520, lng: -59.080 },
@@ -3111,7 +3234,9 @@ function extractPlacesFromText(text) {
   const detected = [];
   TOPONIMOS_MALVINAS.forEach(topo => {
     if (topo.alias.some(a => lower.includes(a))) {
-      detected.push(topo.nombre);
+      if (!detected.includes(topo.nombre)) {
+        detected.push(topo.nombre);
+      }
     }
   });
   return detected;
@@ -3119,11 +3244,15 @@ function extractPlacesFromText(text) {
 
 const UNIDADES_MALVINAS = [
   "RI 7", "RI 25", "RI 4", "RI 12", "RI 8", "RI 5", "RI 6", "RI 3",
-  "BIM 5", "BIM 2", "Buzos Tácticos", "Comandos Anfibios",
+  "Regimiento 7", "Regimiento 25", "Regimiento 4", "Regimiento 12", "Regimiento 8", "Regimiento 5", "Regimiento 6", "Regimiento 3",
+  "Regimiento de Infantería 7", "Regimiento de Infantería 25", "Regimiento de Infantería 4", "Regimiento de Infantería 12",
+  "BIM 5", "BIM 2", "Batallón de Infantería de Marina 5", "Batallón de Infantería de Marina 2",
+  "Buzos Tácticos", "Comandos Anfibios",
   "Fuerza Aérea Argentina", "V Brigada Aérea", "VI Brigada Aérea", "I Brigada Aérea", "Grupo 5 de Caza", "Grupo 6 de Caza",
   "ARA General Belgrano", "ARA Bahía Paraíso", "ARA Guerrico", "ARA Sobral", "ARA San Luis", "ARA Bouchard", "ARA Piedrabuena",
-  "Escuadrón Alacrán de Gendarmería", "Compañía de Comandos 601", "Compañía de Comandos 602",
-  "Grupo de Artillería 3", "Grupo de Artillería Aerotransportado 4", "Compañía de Ingenieros Mecanizada 10", "Compañía de Ingenieros 9"
+  "Escuadrón Alacrán", "Compañía de Comandos 601", "Compañía de Comandos 602",
+  "Grupo de Artillería 3", "GA 3", "Grupo de Artillería Aerotransportado 4", "GAA 4",
+  "Compañía de Ingenieros Mecanizada 10", "Compañía de Ingenieros 9", "Prefectura Naval Argentina"
 ];
 
 function extractUnitsFromText(text) {
@@ -3133,10 +3262,96 @@ function extractUnitsFromText(text) {
   UNIDADES_MALVINAS.forEach(u => {
     const uClean = u.toLowerCase();
     if (lower.includes(uClean)) {
-      detected.push(u);
+      if (!detected.includes(u)) {
+        detected.push(u);
+      }
     }
   });
   return detected;
+}
+
+function extractDatesFromText(text) {
+  if (!text) return [];
+  const matches = [];
+  const datePatterns = [
+    /\b(\d{1,2}\s+de\s+(?:marzo|abril|mayo|junio))\b/gi,
+    /\b((?:marzo|abril|mayo|junio)\s+de\s+1982)\b/gi,
+    /\b(noche\s+del\s+\d{1,2}\s+al\s+\d{1,2}\s+de\s+junio)\b/gi,
+    /\b(1982)\b/g
+  ];
+  datePatterns.forEach(pat => {
+    let m;
+    while ((m = pat.exec(text)) !== null) {
+      const val = m[1] || m[0];
+      if (!matches.includes(val)) {
+        matches.push(val);
+      }
+    }
+  });
+  return matches;
+}
+
+// Control de estado para prevenir envíos automáticos o duplicados
+let isProcessingChat = false;
+let lastChatSendTime = 0;
+const CHAT_DEBOUNCE_MS = 1200;
+
+function setChatControlsState(isProcessing) {
+  isProcessingChat = isProcessing;
+  const btnSend = document.getElementById("btn-send");
+  const chatInput = document.getElementById("chat-input");
+  const chipsContainer = document.getElementById("chat-chips");
+
+  if (btnSend) {
+    btnSend.disabled = isProcessing;
+    btnSend.style.opacity = isProcessing ? "0.45" : "1";
+    btnSend.style.cursor = isProcessing ? "not-allowed" : "pointer";
+    btnSend.style.pointerEvents = isProcessing ? "none" : "auto";
+  }
+
+  if (chatInput) {
+    chatInput.disabled = isProcessing;
+  }
+
+  if (chipsContainer) {
+    chipsContainer.style.pointerEvents = isProcessing ? "none" : "auto";
+    chipsContainer.style.opacity = isProcessing ? "0.55" : "1";
+  }
+}
+
+async function handleChatSubmission(rawText, isRetry = false) {
+  const text = (rawText || "").trim();
+  if (!text) return;
+
+  const now = Date.now();
+  if (isProcessingChat) return;
+  if (now - lastChatSendTime < CHAT_DEBOUNCE_MS) return;
+  lastChatSendTime = now;
+
+  appendMessage("user", text);
+
+  const chatInput = document.getElementById("chat-input");
+  if (chatInput) {
+    chatInput.value = "";
+  }
+
+  setChatControlsState(true);
+  showTypingIndicator(true);
+
+  try {
+    const response = await ChatService.sendMessage(text, currentChatMode);
+    showTypingIndicator(false);
+    appendMessage("bot", response.respuesta);
+  } catch (err) {
+    showTypingIndicator(false);
+    console.warn("Chat error:", err);
+    appendMessage("bot", "⚠️ <strong>No se pudo conectar con el servidor local de IA.</strong><br><br>Por favor asegúrate de encender el puente ejecutando en tu terminal:<br><code>python server.py</code>");
+  } finally {
+    setChatControlsState(false);
+    if (chatInput) {
+      setTimeout(() => chatInput.focus(), 150);
+    }
+  }
 }
 
 function initChatbot() {
@@ -3171,7 +3386,7 @@ function initChatbot() {
       currentChatMode = "testimonio_veterano";
       tabVeterano.classList.add("active");
       tabConsulta.classList.remove("active");
-      chatInput.placeholder = "Indica tu Nombre y Apellido para iniciar el registro...";
+      chatInput.placeholder = "Comparte tu vivencia o testimonio de Malvinas...";
     });
 
     tabConsulta.addEventListener("click", () => {
@@ -3182,45 +3397,36 @@ function initChatbot() {
     });
   }
 
+  // Sugerencias: solo responde cuando el usuario presiona explícitamente un botón
   if (chipsContainer) {
     chipsContainer.addEventListener("click", (e) => {
       const chip = e.target.closest(".chip-btn");
-      if (chip) {
-        chatInput.value = chip.dataset.text;
-        chatInput.focus();
+      if (chip && !isProcessingChat) {
+        const chipText = chip.dataset.text || chip.textContent.trim();
+        if (chipText) {
+          handleChatSubmission(chipText);
+        }
       }
     });
   }
 
+  // Envío manual explícito por formulario
   if (chatForm) {
     chatForm.addEventListener("submit", (e) => {
       e.preventDefault();
-      const text = chatInput.value.trim();
-      // Si el usuario no escribe nada, no envía nada ni agradece
-      if (!text) return;
-
-      appendMessage("user", text);
-      chatInput.value = "";
-      showTypingIndicator(true);
-
-      ChatService.sendMessage(text, currentChatMode)
-        .then((response) => {
-          showTypingIndicator(false);
-          appendMessage("bot", response.respuesta);
-        })
-        .catch((err) => {
-          showTypingIndicator(false);
-          appendMessage("bot", "Ocurrió un error al procesar tu solicitud. Tu mensaje se conservará localmente.");
-          console.error("Chat error:", err);
-        });
+      const text = chatInput ? chatInput.value.trim() : "";
+      if (!text || isProcessingChat) return;
+      handleChatSubmission(text);
     });
 
-    chatInput.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        chatForm.dispatchEvent(new Event("submit"));
-      }
-    });
+    if (chatInput) {
+      chatInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          chatForm.dispatchEvent(new Event("submit"));
+        }
+      });
+    }
   }
 }
 
@@ -3267,159 +3473,153 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
+function formatMarkdownToHtml(markdown) {
+  if (!markdown) return "";
+  let html = markdown
+    // Convertir negritas **texto**
+    .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+    // Convertir cursivas *texto*
+    .replace(/\*(.*?)\*/g, "<em>$1</em>")
+    // Convertir subtítulos de markdown
+    .replace(/^### (.*$)/gim, "<strong style='display:block; margin: 6px 0 2px 0;'>$1</strong>")
+    .replace(/^## (.*$)/gim, "<strong style='display:block; margin: 8px 0 4px 0; font-size: 1.05em;'>$1</strong>")
+    // Convertir listas con viñetas (* o -)
+    .replace(/^\s*[\*\-]\s+(.+)$/gm, "<li>$1</li>")
+    // Convertir saltos de línea y párrafos
+    .replace(/\n\n+/g, "<br><br>")
+    .replace(/\n/g, "<br>");
+
+  // Agrupar elementos <li> dentro de <ul>
+  html = html.replace(/(<li>.*?<\/li>)+/g, (match) => `<ul style="margin: 6px 0; padding-left: 18px;">${match}</ul>`);
+
+  return html;
+}
+
 // ==================== 8. CAPA DE SERVICIO DE RED Y BASE DE CONOCIMIENTO ====================
 const ChatService = {
   async sendMessage(mensaje, modo) {
-    // Si estamos en modo testimonio_veterano, procesamos el wizard estructurado
-    if (modo === "testimonio_veterano") {
-      return this.handleVeteranoWorkflow(mensaje);
-    }
+    const text = (mensaje || "").trim();
 
-    // Si estamos en consulta_historica, respondemos cualquier pregunta histórica
-    if (modo === "consulta_historica") {
-      // Si USE_MOCK es false intentamos backend, pero si falla o USE_MOCK es true, usamos la enciclopedia completa
-      if (!CONFIG.USE_MOCK) {
-        try {
-          const payload = {
-            sessionId: "session-" + (sessionStorage.getItem("malvinas_sid") || (sessionStorage.setItem("malvinas_sid", Date.now()), Date.now())),
-            tipo: modo,
-            mensaje: mensaje,
-            message: mensaje,
-            timestamp: new Date().toISOString()
-          };
-          const response = await fetch(CONFIG.API_BASE_URL + CONFIG.ENDPOINTS.CHAT, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-          });
-          if (response.ok) {
-            const data = await response.json();
-            return { status: "success", respuesta: data.reply || data.respuesta };
-          }
-        } catch (err) {
-          console.warn("Backend no disponible, recurriendo a enciclopedia histórica local:", err);
-        }
-      }
-
-      // Respuesta desde la base de conocimientos documental completa
-      return new Promise((resolve) => {
-        setTimeout(() => {
-          resolve({
-            status: "success",
-            respuesta: this.answerHistoricalQuestion(mensaje)
-          });
-        }, 500);
-      });
-    }
-
-    return {
-      status: "success",
-      respuesta: "Indícame tu consulta o testimonio para orientarte."
-    };
-  },
-
-  // Flujo guiado para Veteranos y Familiares (Pide Nombre, Rol, Relato y Guarda en Drive)
-  async handleVeteranoWorkflow(mensaje) {
-    const text = mensaje.trim();
-
-    // 1. Si no hay nada o solo espacios: no responder agradeciendo
+    // 1. Validación de mensaje vacío
     if (!text) {
       return {
         status: "empty",
-        respuesta: "Por favor, escribe tu nombre o relato para poder asistirte."
+        respuesta: "Por favor, escribe tu consulta o testimonio para poder orientarte."
       };
     }
 
-    // 2. Si es una pregunta histórica en el lugar de veterano:
-    if (isHistoricalQuestion(text)) {
-      return {
-        status: "success",
-        respuesta: "Esta solapa está reservada para que puedas contar tu propia historia o vivencia personal (o la de un familiar). Si deseas realizar consultas históricas sobre los hechos de la guerra, puedes cambiar a la solapa <strong>Consulta Histórica</strong> donde te responderé todas tus dudas.<br><br>Si deseas registrar tu testimonio aquí, con gusto lo escuchamos: ¿cuál es tu <strong>Nombre y Apellido</strong>?"
-      };
+    // 2. Si estamos en modo testimonio_veterano, resguardamos de forma transparente las entidades y vivencias
+    if (modo === "testimonio_veterano") {
+      try {
+        if (typeof extractNameFromText === "function") {
+          const nuevoNombre = extractNameFromText(text, testimonioMemory.nombre);
+          if (nuevoNombre && nuevoNombre !== testimonioMemory.nombre) {
+            testimonioMemory.nombre = nuevoNombre;
+            testimonioMemory.lugares = [];
+            testimonioMemory.unidades = [];
+            testimonioMemory.fechas = [];
+            testimonioMemory.relatos = [];
+            testimonioMemory.rol = "";
+          }
+        }
+        if (typeof extractRoleFromText === "function") {
+          const nuevoRol = extractRoleFromText(text, testimonioMemory.rol);
+          if (nuevoRol) testimonioMemory.rol = nuevoRol;
+        }
+
+        // Si es una pregunta histórica, NO almacenar sus términos como vivencia personal
+        if (typeof isHistoricalQuestion === "function" && isHistoricalQuestion(text)) {
+          // No acumular como vivencia
+        } else {
+          if (typeof extractPlacesFromText === "function") {
+            extractPlacesFromText(text).forEach(l => {
+              if (!testimonioMemory.lugares.includes(l)) testimonioMemory.lugares.push(l);
+            });
+          }
+          if (typeof extractUnitsFromText === "function") {
+            extractUnitsFromText(text).forEach(u => {
+              if (!testimonioMemory.unidades.includes(u)) testimonioMemory.unidades.push(u);
+            });
+          }
+          if (typeof extractDatesFromText === "function") {
+            extractDatesFromText(text).forEach(f => {
+              if (!testimonioMemory.fechas.includes(f)) testimonioMemory.fechas.push(f);
+            });
+          }
+          if (typeof isGreetingOnly === "function" && !isGreetingOnly(text) && text.split(/\s+/).length >= 3) {
+            testimonioMemory.relatos.push(text);
+          }
+        }
+
+        // Respaldo del testimonio en localStorage
+        await this.syncTestimonioToDrive({
+          nombre: testimonioMemory.nombre,
+          rol: testimonioMemory.rol,
+          relato: text,
+          full_story: testimonioMemory.relatos.join("\n\n"),
+          lugares: testimonioMemory.lugares,
+          unidades: testimonioMemory.unidades,
+          fechas: testimonioMemory.fechas
+        });
+      } catch (backupErr) {
+        console.warn("Resguardo local de testimonio:", backupErr);
+      }
     }
 
-    // 3. Si es un saludo inicial y no ha ingresado nombre:
-    if (isGreeting(text) && (!testimonioWizard.data.nombre || testimonioWizard.step === "ESPERANDO_NOMBRE")) {
-      testimonioWizard.step = "ESPERANDO_NOMBRE";
-      return {
-        status: "success",
-        respuesta: "Hola. Bienvenido al espacio de registro y testimonio de Malvinas. Aquí puedes preservar tu historia en la Hoja de Cálculo oficial de Google Drive y en el archivo nacional.<br><br>Para comenzar el registro, por favor indícanos tu <strong>Nombre y Apellido</strong>:"
-      };
-    }
+    // 3. Conexión segura y directa al backend local en Python (Libre de CORS con Gemini)
+    try {
+      const endpoint = `${CONFIG.API_BASE_URL}${CONFIG.ENDPOINTS.CHAT}`;
 
-    // 4. PASO 1: Captura de Nombre y Apellido
-    if (testimonioWizard.step === "ESPERANDO_NOMBRE" || !testimonioWizard.data.nombre) {
-      let nombre = text.replace(/^(me llamo|mi nombre es|soy|yo soy)\s+/i, "").trim();
-      nombre = nombre.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" ");
-      testimonioWizard.data.nombre = nombre;
-      testimonioWizard.step = "ESPERANDO_ROL";
+      const res = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          message: text,
+          mode: modo,
+          history: geminiChatHistory
+        })
+      });
 
-      return {
-        status: "success",
-        respuesta: `Gracias, <strong>${nombre}</strong>.<br><br>¿Eres <strong>Veterano de Guerra de Malvinas</strong> o <strong>Familiar</strong> de un veterano o caído en combate?`
-      };
-    }
-
-    // 5. PASO 2: Captura de Rol (Veterano o Familiar)
-    if (testimonioWizard.step === "ESPERANDO_ROL" || !testimonioWizard.data.rol) {
-      const lower = text.toLowerCase();
-      let rol = "Veterano de Guerra";
-      if (lower.includes("familiar") || lower.includes("hijo") || lower.includes("hija") || lower.includes("esposa") || lower.includes("viuda") || lower.includes("hermano") || lower.includes("hermana") || lower.includes("madre") || lower.includes("padre") || lower.includes("nieto") || lower.includes("nieta") || lower.includes("sobrino")) {
-        rol = "Familiar de Veterano";
-      } else if (lower.includes("veterano") || lower.includes("excombatiente") || lower.includes("soldado") || lower.includes("conscripto") || lower.includes("marinero") || lower.includes("piloto") || lower.includes("oficial") || lower.includes("suboficial")) {
-        rol = "Veterano de Guerra";
-      } else {
-        rol = text.trim();
+      if (!res.ok) {
+        throw new Error(`Error en el servidor local (HTTP ${res.status})`);
       }
 
-      testimonioWizard.data.rol = rol;
-      testimonioWizard.step = "ESPERANDO_RELATO";
+      const data = await res.json();
+      const respuestaTexto = data.respuesta || "No se recibió respuesta del modelo.";
+
+      // Guardar en el historial conversacional
+      geminiChatHistory.push({ role: "user", parts: [{ text: text }] });
+      geminiChatHistory.push({ role: "model", parts: [{ text: respuestaTexto }] });
+
+      if (geminiChatHistory.length > 20) {
+        geminiChatHistory = geminiChatHistory.slice(-20);
+      }
 
       return {
         status: "success",
-        respuesta: `Entendido, <strong>${testimonioWizard.data.nombre}</strong> (${rol}).<br><br>Por favor, cuéntanos con total libertad qué hecho o vivencia deseas compartir para que quede guardado en la memoria histórica (puedes mencionar la zona o monte donde estuviste, fechas, tu regimiento o unidad, y todo lo que sientas transmitir):`
+        respuesta: formatMarkdownToHtml(respuestaTexto)
+      };
+    } catch (error) {
+      console.error("[ChatService] Error comunicando con backend Python:", error);
+      return {
+        status: "error",
+        respuesta: "⚠️ <strong>No se pudo conectar con el servidor local de IA.</strong><br><br>Por favor asegúrate de encender el puente ejecutando en tu terminal:<br><code>python server.py</code>"
       };
     }
-
-    // 6. PASO 3: Captura de Hechos / Relato y Sincronización en Google Drive
-    testimonioWizard.data.relato = text;
-    const detectedPlaces = extractPlacesFromText(text);
-    const detectedUnits = extractUnitsFromText(text);
-    testimonioWizard.data.lugares = detectedPlaces;
-    testimonioWizard.data.unidades = detectedUnits;
-
-    // Sincronización en la Hoja de Cálculo de Google Drive y persistencia local
-    await this.syncTestimonioToDrive(testimonioWizard.data);
-
-    let detallesExtra = "";
-    if (detectedPlaces.length > 0) {
-      detallesExtra += `<br>📍 <strong>Acontecimientos georreferenciados:</strong> ${detectedPlaces.join(", ")}`;
-    }
-    if (detectedUnits.length > 0) {
-      detallesExtra += `<br>🎖️ <strong>Unidad militar vinculada:</strong> ${detectedUnits.join(", ")}`;
-    }
-
-    const nombreFinal = testimonioWizard.data.nombre;
-    const rolFinal = testimonioWizard.data.rol;
-
-    // Se reinicia el wizard para permitir otro relato si lo desea
-    testimonioWizard.reset();
-
-    return {
-      status: "success",
-      guardadoEnDB: true,
-      respuesta: `Muchísimas gracias, <strong>${nombreFinal}</strong> (${rolFinal}).<br><br>✅ Tu testimonio y los acontecimientos relatados han sido <strong>registrados y actualizados en la Hoja de Cálculo oficial de Google Drive</strong> (pestañas <em>Testimonios_Generales</em> y <em>Eventos_Georreferenciados</em>) y en la base de datos nacional.${detallesExtra}<br><br>Tu voz es un aporte sagrado para la memoria histórica de nuestra Patria y el reconocimiento a nuestros héroes.<br><br>¿Deseas registrar otro testimonio o agregar más información?`
-    };
   },
 
-  // Sincronización con Google Drive (Google Sheets) y Respaldo Local
+  // Sincronización y Resguardo Local y de Red
   async syncTestimonioToDrive(data) {
     const backupItem = {
-      nombre_completo: data.nombre,
-      rol_participante: data.rol,
+      nombre_completo: data.nombre || "Veterano / Testimoniante",
+      rol_participante: data.rol || "Veterano de Guerra",
       relato: data.relato,
-      lugares: data.lugares,
-      unidades: data.unidades,
+      full_story: data.full_story || data.relato,
+      lugares: data.lugares || [],
+      unidades: data.unidades || [],
+      fechas: data.fechas || [],
       fecha_registro: new Date().toISOString()
     };
 
@@ -3429,17 +3629,18 @@ const ChatService = {
       const actual = JSON.parse(localStorage.getItem(storageKey) || "[]");
       actual.push(backupItem);
       localStorage.setItem(storageKey, JSON.stringify(actual));
+      testimonioMemory.save();
     } catch (e) {
       console.warn("Respaldo localStorage:", e);
     }
 
-    // 2. Envío a la API de Django (que sincroniza directamente en Google Sheets de Drive)
+    // 2. Envío a la API de Django (persistencia en base de datos del sistema)
     try {
       const payload = {
-        name: data.nombre,
-        witness_name: data.nombre,
-        role: data.rol,
-        witness_role: data.rol,
+        name: data.nombre || "Veterano / Testimoniante",
+        witness_name: data.nombre || "Veterano / Testimoniante",
+        role: data.rol || "Veterano de Guerra",
+        witness_role: data.rol || "Veterano de Guerra",
         message: data.relato,
         mensaje: data.relato,
         units: (data.unidades || []).join(", "),
@@ -3455,8 +3656,8 @@ const ChatService = {
         body: JSON.stringify(payload)
       });
     } catch (err) {
-      // Si el backend no está corriendo en localhost:8000 en este instante, el dato ya quedó resguardado en el navegador
-      console.log("Sincronización API background:", err.message);
+      // Si el backend no está respondiendo en este instante, el dato ya quedó resguardado en el navegador
+      console.log("Sincronización background:", err.message);
     }
   },
 
@@ -3555,7 +3756,7 @@ const ChatService = {
       PUNTOS_HISTORICOS.forEach(pto => {
         let score = 0;
         const textoHito = `${pto.nombre} ${pto.fecha} ${pto.tipo} ${pto.unidadesArgentinas} ${pto.descripcion} ${pto.historiaCompleta ? pto.historiaCompleta.join(' ') : ''}`.toLowerCase();
-        
+
         // Coincidencia por palabras clave de la pregunta
         const palabrasPregunta = q.split(/\s+/).filter(w => w.length > 3);
         palabrasPregunta.forEach(palabra => {
