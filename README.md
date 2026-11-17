@@ -2,7 +2,6 @@
 
 Sistema de diálogo empático con Veteranos de la Guerra de Malvinas y sus familiares para la recolección, estructuración territorial y georreferenciación de acontecimientos históricos, desarrollado sobre **Django**, contenerizado con **Docker** y sincronizado en tiempo real con una **Hoja de Cálculo de Google (Google Sheets)**.
 
-Inspirado en la arquitectura modular y desacoplada del proyecto **UMSA IA Turnos**.
 
 ---
 
