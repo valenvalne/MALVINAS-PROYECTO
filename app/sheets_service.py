@@ -203,3 +203,107 @@ def sync_event_to_sheets(event):
             return False, f"Evento guardado localmente. Error Sheets: {e}"
 
     return True, "Evento guardado en respaldo local CSV"
+
+
+XLSX_VIVENCIAS = STORAGE / "Vivencias_Malvinas_1982.xlsx"
+CSV_VIVENCIAS = STORAGE / "vivencias_registradas.csv"
+HEADER_VIVENCIAS = [
+    "Fecha y Hora", "Nombre de quien dio el testimonio", "Rol / Vínculo",
+    "Veterano de Guerra Homenajeado", "Unidad Militar", "Lugares en Malvinas",
+    "Vivencia Relatada", "Respuesta del Asistente"
+]
+
+def record_vivencia_to_spreadsheet(session, user_message: str, agent_reply: str, places_str: str = "", extra_data: dict = None):
+    """
+    Registra cada vivencia o relato en la hoja de cálculo
+    (tanto en formato Excel .xlsx y CSV local como en Google Sheets en la nube).
+    """
+    import datetime
+    now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    witness = getattr(session, "witness", None)
+
+    ed = extra_data or {}
+    full_name = ed.get("full_name") or (witness.name if (witness and witness.name != "Veterano / Testimoniante") else "Anónimo / Por Identificar")
+    vet_name = ed.get("veteran_name")
+    role = ed.get("role") or (witness.role if witness else "Veterano de Guerra")
+    unit = ed.get("regiment") or (witness.unit if (witness and witness.unit) else "Sin especificar")
+
+    target_vet = vet_name if vet_name else full_name
+    row_data = [
+        now_str,
+        full_name,
+        role,
+        target_vet,
+        unit,
+        places_str if places_str else "Sector General Malvinas",
+        user_message.strip(),
+        agent_reply.strip()
+    ]
+
+    # 1. Respaldo en CSV de Vivencias
+    try:
+        file_exists = CSV_VIVENCIAS.exists()
+        with open(CSV_VIVENCIAS, "a", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            if not file_exists:
+                writer.writerow(HEADER_VIVENCIAS)
+            writer.writerow(row_data)
+    except Exception as e:
+        logger.error(f"Error al escribir CSV de vivencias: {e}")
+
+    # 2. Respaldo en Libro Excel .xlsx estructurado
+    try:
+        import openpyxl
+        from openpyxl.styles import Font, PatternFill, Alignment
+
+        if XLSX_VIVENCIAS.exists():
+            wb = openpyxl.load_workbook(str(XLSX_VIVENCIAS))
+            ws = wb.active
+        else:
+            wb = openpyxl.Workbook()
+            ws = wb.active
+            ws.title = "Vivencias y Testimonios"
+            ws.append(HEADER_VIVENCIAS)
+            header_font = Font(name="Arial", size=11, bold=True, color="FFFFFF")
+            header_fill = PatternFill(start_color="1E3A8A", end_color="1E3A8A", fill_type="solid")
+            for col_idx in range(1, len(HEADER_VIVENCIAS) + 1):
+                cell = ws.cell(row=1, column=col_idx)
+                cell.font = header_font
+                cell.fill = header_fill
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+
+        ws.append(row_data)
+        # Ajustar ancho automático de columnas
+        for col in ws.columns:
+            max_len = max(len(str(cell.value or '')) for cell in col)
+            col_letter = openpyxl.utils.get_column_letter(col[0].column)
+            ws.column_dimensions[col_letter].width = min(max(max_len + 3, 12), 65)
+
+        wb.save(str(XLSX_VIVENCIAS))
+    except Exception as e:
+        logger.error(f"Error al actualizar libro Excel de vivencias: {e}")
+
+    # 3. Sincronización en vivo con Google Sheets (si está configurado)
+    spreadsheet_id = os.getenv("GOOGLE_SHEETS_SPREADSHEET_ID", "").strip()
+    client, _ = get_gspread_client()
+
+    if client and spreadsheet_id:
+        try:
+            sh = client.open_by_key(spreadsheet_id)
+            tab_name = os.getenv("SHEETS_TAB_TESTIMONIOS", "Testimonios_Generales")
+            worksheet = None
+            try:
+                worksheet = sh.worksheet(tab_name)
+            except Exception:
+                try:
+                    worksheet = sh.worksheet("Vivencias")
+                except Exception:
+                    pass
+
+            if worksheet:
+                worksheet.append_row(row_data)
+                return True, "Vivencia guardada en Google Sheets y en Excel local."
+        except Exception as e:
+            logger.warning(f"Error al guardar en Google Sheets: {e}")
+
+    return True, "Vivencia guardada correctamente en la hoja de cálculo."

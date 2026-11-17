@@ -1,3 +1,56 @@
+
+async function performChatReset() {
+  try {
+    const res = await fetch("/api/session/reset/", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ sessionId: localStorage.getItem("malvinas_sid") })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.session_id) {
+        localStorage.setItem("malvinas_sid", data.session_id);
+      }
+      const messagesContainer = document.getElementById("chat-messages");
+      if (messagesContainer) {
+        const welcomeText = data.welcome_message || "¡Hola! Es un honor recibirte en este espacio de memoria de Malvinas. Para comenzar, ¿cómo te llamás?";
+        messagesContainer.innerHTML = `
+          <div class="message-bubble bot-message">
+            <div class="bubble-text">
+              ${welcomeText}
+            </div>
+            <span class="message-time">Ahora</span>
+          </div>
+        `;
+      }
+      const chatInput = document.getElementById("chat-input");
+      if (chatInput) {
+        chatInput.value = "";
+        chatInput.focus();
+      }
+      if (typeof testimonioWizard !== "undefined" && testimonioWizard.reset) {
+        testimonioWizard.reset();
+      }
+      return;
+    }
+  } catch (e) {
+    console.error("Error al reiniciar sesión:", e);
+  }
+  localStorage.removeItem("malvinas_sid");
+  const messagesContainer = document.getElementById("chat-messages");
+  if (messagesContainer) {
+    messagesContainer.innerHTML = `
+      <div class="message-bubble bot-message">
+        <div class="bubble-text">
+          ¡Hola! Es un honor recibirte en este espacio de memoria de Malvinas. Para comenzar, ¿cómo te llamás?
+        </div>
+        <span class="message-time">Ahora</span>
+      </div>
+    `;
+  }
+}
+
 /**
  * ============================================================================
  * MALVINAS 1982: AUTO-GUÍA CRONOLÓGICA DÍA POR DÍA, TERRITORIO Y TESTIMONIOS
@@ -18,10 +71,10 @@
 
 // ==================== CONFIGURACIÓN GLOBAL Y ENDPOINTS ====================
 const CONFIG = {
-  USE_MOCK: true,
-  API_BASE_URL: "http://localhost:8000",
+  USE_MOCK: false,
+  API_BASE_URL: "",
   ENDPOINTS: {
-    CHAT: "/api/chat",
+    CHAT: "/api/chat/",
     SAVE_TESTIMONIO: "/api/testimonios"
   }
 };
@@ -2310,6 +2363,7 @@ function initMap() {
     zoomControl: false,
     attributionControl: false
   });
+  window.map = map;
 
   L.control.zoom({ position: "bottomright" }).addTo(map);
 
@@ -3150,15 +3204,29 @@ function initChatbot() {
   const tabConsulta = document.getElementById("tab-consulta");
   const chipsContainer = document.getElementById("chat-chips");
 
+
+
+  const messagesContainer = document.getElementById("chat-messages");
+  if (messagesContainer) {
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+  }
+
   function toggleChat() {
     widgetContainer.classList.toggle("open");
     if (widgetContainer.classList.contains("open")) {
-      setTimeout(() => chatInput.focus(), 300);
+      setTimeout(() => {
+        if (messagesContainer) messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        if (chatInput) chatInput.focus();
+      }, 300);
     }
   }
 
   if (bubbleBtn) bubbleBtn.addEventListener("click", toggleChat);
   if (btnMinimize) btnMinimize.addEventListener("click", toggleChat);
+  const btnReset = document.getElementById("btn-reset-chat");
+  if (btnReset) {
+    btnReset.addEventListener("click", performChatReset);
+  }
   if (btnHeaderChat) {
     btnHeaderChat.addEventListener("click", () => {
       widgetContainer.classList.add("open");
@@ -3186,8 +3254,14 @@ function initChatbot() {
     chipsContainer.addEventListener("click", (e) => {
       const chip = e.target.closest(".chip-btn");
       if (chip) {
-        chatInput.value = chip.dataset.text;
-        chatInput.focus();
+        if (chip.dataset.action === "reset" || chip.id === "chip-btn-reset") {
+          performChatReset();
+          return;
+        }
+        if (chip.dataset.text) {
+          chatInput.value = chip.dataset.text;
+          chatInput.focus();
+        }
       }
     });
   }
@@ -3270,51 +3344,118 @@ function escapeHtml(text) {
 // ==================== 8. CAPA DE SERVICIO DE RED Y BASE DE CONOCIMIENTO ====================
 const ChatService = {
   async sendMessage(mensaje, modo) {
-    // Si estamos en modo testimonio_veterano, procesamos el wizard estructurado
-    if (modo === "testimonio_veterano") {
-      return this.handleVeteranoWorkflow(mensaje);
+    const text = (mensaje || "").trim();
+    if (!text) {
+      return {
+        status: "empty",
+        respuesta: "Por favor, escribe tu consulta o testimonio para poder asistirte."
+      };
     }
 
-    // Si estamos en consulta_historica, respondemos cualquier pregunta histórica
-    if (modo === "consulta_historica") {
-      // Si USE_MOCK es false intentamos backend, pero si falla o USE_MOCK es true, usamos la enciclopedia completa
-      if (!CONFIG.USE_MOCK) {
-        try {
-          const payload = {
-            sessionId: "session-" + (sessionStorage.getItem("malvinas_sid") || (sessionStorage.setItem("malvinas_sid", Date.now()), Date.now())),
-            tipo: modo,
-            mensaje: mensaje,
-            message: mensaje,
-            timestamp: new Date().toISOString()
-          };
-          const response = await fetch(CONFIG.API_BASE_URL + CONFIG.ENDPOINTS.CHAT, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-          });
-          if (response.ok) {
-            const data = await response.json();
-            return { status: "success", respuesta: data.reply || data.respuesta };
+    // 1. Conexión DIRECTA con la API real de Claude / Django
+    try {
+      const sessionId = localStorage.getItem("malvinas_sid") || ("session-" + Date.now());
+      localStorage.setItem("malvinas_sid", sessionId);
+
+      const endpoint = (CONFIG.API_BASE_URL || "") + "/api/chat/";
+      const payload = {
+        sessionId: sessionId,
+        tipo: modo,
+        message: text,
+        mensaje: text,
+        timestamp: new Date().toISOString()
+      };
+
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(payload)
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.reset_session) {
+          const messagesContainer = document.getElementById("chat-messages");
+          if (messagesContainer) {
+            messagesContainer.innerHTML = "";
           }
-        } catch (err) {
-          console.warn("Backend no disponible, recurriendo a enciclopedia histórica local:", err);
+          if (data.session_id) {
+            localStorage.setItem("malvinas_sid", data.session_id);
+          }
+          if (typeof testimonioWizard !== "undefined" && testimonioWizard.reset) {
+            testimonioWizard.reset();
+          }
+        }
+        const replyText = data.reply || data.respuesta;
+        if (replyText) {
+          // Si el backend extrajo un acontecimiento con coordenadas, centrar el mapa y posicionar marcador
+          const targetMap = window.map || (typeof map !== "undefined" ? map : null);
+          if (data.events_extracted && data.events_extracted.length > 0 && targetMap) {
+            const ev = data.events_extracted[0];
+            if (ev.latitude && ev.longitude) {
+              try {
+                targetMap.flyTo([ev.latitude, ev.longitude], 13, { duration: 1.5 });
+                if (typeof L !== "undefined") {
+                  const witnessIcon = L.divIcon({
+                    className: "witness-marker-icon",
+                    html: `
+                      <div class="custom-marker-pin marker-mes-jun" style="background:#0284c7;border:2px solid #ffffff;box-shadow:0 0 16px rgba(2,132,199,0.95);transform:scale(1.25);animation:pulse 2s infinite;">
+                        <span class="pin-date-label">VIVENCIA</span>
+                        <i class="fa-solid fa-flag"></i>
+                      </div>
+                    `,
+                    iconSize: [38, 38],
+                    iconAnchor: [19, 19]
+                  });
+                  const wMarker = L.marker([ev.latitude, ev.longitude], { icon: witnessIcon }).addTo(targetMap);
+                  const vetName = ev.veteran_name || ev.veteran || "Veterano de Guerra";
+                  const familyInfo = (ev.testimoniante && ev.veteran_name && ev.testimoniante !== ev.veteran_name)
+                    ? `<p style="font-size:0.78rem;color:#1e293b;margin:3px 0 0 0;">✍️ <strong>Aportado por:</strong> ${ev.testimoniante} (${ev.role || 'Familiar'})</p>`
+                    : '';
+
+                  wMarker.bindPopup(`
+                    <div class="custom-popup-content" style="max-width:320px;font-family:sans-serif;">
+                      <div style="background:#0284c7;color:#ffffff;padding:8px 10px;border-radius:6px 6px 0 0;margin:-10px -10px 8px -10px;">
+                        <span style="font-size:0.7rem;text-transform:uppercase;letter-spacing:1px;font-weight:700;display:block;opacity:0.9;">Testimonio Georreferenciado</span>
+                        <h3 style="color:#ffffff;margin:2px 0 0 0;font-size:1.05rem;line-height:1.2;">📍 ${ev.toponymy || ev.title}</h3>
+                      </div>
+                      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-left:4px solid #16a34a;padding:8px;border-radius:4px;margin-bottom:8px;">
+                        <p style="font-size:0.92rem;color:#14532d;margin:0;font-weight:800;line-height:1.2;">
+                          🎖️ Veterano de Guerra: ${vetName}
+                        </p>
+                        ${familyInfo}
+                      </div>
+                      <p style="font-size:0.83rem;margin-bottom:4px;color:#334155;"><strong>Posición Georreferenciada en Malvinas</strong></p>
+                      ${ev.units ? '<p style="font-size:0.82rem;margin-bottom:4px;color:#475569;"><strong>Unidad:</strong> ' + ev.units + '</p>' : ''}
+                      ${ev.event_date ? '<p style="font-size:0.8rem;margin-bottom:4px;color:#64748b;"><strong>Período:</strong> ' + ev.event_date + '</p>' : ''}
+                      <p style="font-size:0.82rem;color:#334155;font-style:italic;background:#f8fafc;padding:6px 8px;border-left:3px solid #94a3b8;border-radius:2px;margin-top:6px;">${ev.quote || ''}</p>
+                    </div>
+                  `).openPopup();
+                }
+              } catch (mapErr) {
+                console.warn("Error actualizando mapa:", mapErr);
+              }
+            }
+          }
+          return { status: "success", respuesta: replyText };
         }
       }
+    } catch (err) {
+      console.warn("Backend local no respondió, usando enciclopedia de respaldo:", err);
+    }
 
-      // Respuesta desde la base de conocimientos documental completa
-      return new Promise((resolve) => {
-        setTimeout(() => {
-          resolve({
-            status: "success",
-            respuesta: this.answerHistoricalQuestion(mensaje)
-          });
-        }, 500);
-      });
+    // 2. Respaldo documental inteligente si el backend estuviera desconectado
+    if (modo === "consulta_historica" || (typeof isHistoricalQuestion === 'function' && isHistoricalQuestion(text))) {
+      return {
+        status: "success",
+        respuesta: this.answerHistoricalQuestion(text)
+      };
     }
 
     return {
       status: "success",
-      respuesta: "Indícame tu consulta o testimonio para orientarte."
+      respuesta: "Le escucho con total respeto y atención. Cada detalle que comparte es invaluable para mantener viva la memoria de Malvinas. Por favor, continúe a su propio ritmo."
     };
   },
 
@@ -3449,9 +3590,10 @@ const ChatService = {
         timestamp: new Date().toISOString()
       };
 
-      await fetch(CONFIG.API_BASE_URL + "/api/chat/", {
+      await fetch((CONFIG.API_BASE_URL || "") + "/api/chat/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify(payload)
       });
     } catch (err) {

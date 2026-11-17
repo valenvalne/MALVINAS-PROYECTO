@@ -1617,6 +1617,7 @@ textarea:focus-visible {
 
 .bubble-text {
   color: inherit;
+  white-space: pre-wrap;
 }
 
 .message-time {

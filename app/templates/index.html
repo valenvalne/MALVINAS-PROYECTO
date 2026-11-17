@@ -4,276 +4,350 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Plataforma de Memoria Histórica de Malvinas | Agente Testimonial</title>
-  <meta name="description" content="Agente virtual empático para la recolección de testimonios históricos de la Guerra de Malvinas y sincronización en tiempo real con Google Sheets.">
-  
-  <!-- Tipografía Google Fonts -->
+  <meta name="description" content="Portal interactivo y Auto-Guía Cronológica Día por Día de la Guerra de Malvinas de 1982 (19 de marzo al 15 de junio). Exploración cartográfica en 4 escalas, expedientes históricos y testimonios de veteranos.">
+  <title>Malvinas 1982 | Auto-Guía Cronológica, Territorio y Testimonios</title>
+
+  <!-- Google Fonts: Cinzel para títulos conmemorativos, Inter para lectura clara y JetBrains Mono para telemetría cartográfica -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  
-  <!-- Estilos del Sistema -->
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Leaflet.js CSS (100% Gratuito y Libre) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+
+  <!-- Font Awesome para Iconografía -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+
+  <!-- Estilos del Proyecto -->
   <link rel="stylesheet" href="{% static 'css/styles.css' %}">
 </head>
-<body class="malvinas-theme">
-  {% csrf_token %}
+<body>
 
-  <div class="app-container">
-    <!-- BARRA SUPERIOR INSTITUCIONAL -->
-    <header class="main-header">
-      <div class="header-brand">
-        <div class="flag-symbol">
-          <div class="flag-stripe sky"></div>
-          <div class="flag-stripe white"><span class="sun-icon">☀️</span></div>
-          <div class="flag-stripe sky"></div>
+  <!-- ==================== HEADER / HERO CONMEMORATIVO ==================== -->
+  <header class="main-header" id="main-header">
+    <div class="header-content">
+      <div class="brand">
+        <div class="memorial-crest">
+          <i class="fa-solid fa-medal"></i>
         </div>
-        <div class="brand-titles">
-          <h1 class="brand-title">MEMORIA MALVINAS</h1>
-          <p class="brand-subtitle">AGENTE TESTIMONIAL VIRTUAL & GEORREFERENCIACIÓN</p>
+        <div class="brand-text">
+          <h1>MALVINAS 1982</h1>
+          <p class="subtitle">Auto-Guía Cronológica Día por Día (19 Mar – 15 Jun) y Testimonios</p>
         </div>
       </div>
 
       <div class="header-badges">
-        <!-- Indicador de sincronización con Google Sheets -->
-        <div class="status-pill {% if sheets_status.is_connected %}connected{% else %}local{% endif %}" id="sheetsPill" title="{{ sheets_status.message }}">
-          <span class="pill-dot"></span>
-          <span class="pill-text" id="sheetsPillText">
-            {% if sheets_status.is_connected %}Google Sheets: En Vivo{% else %}Respaldo Local Activo{% endif %}
-          </span>
-        </div>
-
-        <button type="button" class="btn btn-outline-light btn-sm" id="btnEditProfile">
-          👤 Perfil Testimonio
-        </button>
-
-        <button type="button" class="btn btn-outline-danger btn-sm" id="btnResetSession" title="Comenzar una nueva entrevista testimonial">
-          🔄 Nueva Sesión
-        </button>
+        <span class="badge badge-flag">
+          <span class="flag-dot"></span> Soberanía Histórica
+        </span>
       </div>
-    </header>
 
-    <!-- CUERPO PRINCIPAL DIVIDIDO: CHAT + PANEL DE HITOS GEOGRÁFICOS -->
-    <main class="main-content-grid">
-      
-      <!-- SECCIÓN DEL CHAT DE ESCUCHA ACTIVA -->
-      <section class="chat-section">
-        <div class="chat-card">
-          <div class="chat-card-header">
-            <div class="agent-info">
-              <div class="agent-avatar">🇦🇷</div>
-              <div>
-                <h2 class="agent-name">Asistente Testimonial de la Memoria</h2>
-                <span class="agent-status-label">Escucha activa y respetuosa • Diálogo permanente</span>
-              </div>
-            </div>
-            <div class="session-badge">
-              Sesión: <span class="mono-code" id="sessionShortId">{{ session.session_id|stringformat:".8s" }}</span>
-            </div>
-          </div>
+      <nav class="header-controls">
+        <button id="btn-reset-map" class="btn btn-secondary" title="Centrar vista general en el Atlántico Sur y las Islas Malvinas">
+          <i class="fa-solid fa-arrows-to-dot"></i> <span>Vista General</span>
+        </button>
+      </nav>
+    </div>
+  </header>
 
-          <!-- MENSAJES DEL CHAT -->
-          <div class="chat-messages-container" id="chatMessages">
-            <!-- Mensaje de bienvenida inicial protocolar -->
-            <div class="message-row assistant">
-              <div class="message-avatar">🇦🇷</div>
-              <div class="message-bubble">
-                <div class="message-meta">
-                  <span class="sender-name">Asistente Testimonial</span>
-                  <span class="message-time">Inicio</span>
-                </div>
-                <div class="message-body">
-                  Buenas tardes. Es un verdadero honor recibirlo en este espacio de memoria y homenaje a nuestros héroes de Malvinas.
-                  <br><br>
-                  Queremos agradecerle profundamente su tiempo y generosidad para compartir sus vivencias o las de su ser querido. Toda la información que decida confiarme será tratada con el más solemne respeto y contribuirá a georreferenciar los acontecimientos en el territorio de las islas.
-                  <br><br>
-                  <strong>¿Le gustaría comenzar contándome en qué unidad sirvió o en qué sector de las islas estuvo destinado?</strong>
-                </div>
-              </div>
-            </div>
+  <!-- ==================== CONTENEDOR PRINCIPAL: MAPA INTERACTIVO ==================== -->
+  <main class="map-viewport-wrapper">
+    <!-- Contenedor del Mapa Leaflet -->
+    <div id="map" class="interactive-map"></div>
 
-            {% for msg in messages %}
-            <div class="message-row {{ msg.role }}">
-              <div class="message-avatar">
-                {% if msg.role == 'user' %}👤{% else %}🇦🇷{% endif %}
-              </div>
-              <div class="message-bubble">
-                <div class="message-meta">
-                  <span class="sender-name">{% if msg.role == 'user' %}{{ session.witness.name }}{% else %}Asistente Testimonial{% endif %}</span>
-                  <span class="message-time">{{ msg.timestamp|date:"H:i" }}</span>
-                </div>
-                <div class="message-body">
-                  {{ msg.content|linebreaksbr }}
-                </div>
-              </div>
-            </div>
-            {% endfor %}
-          </div>
-
-          <!-- ATRIBUTOS Y SUGERENCIAS RÁPIDAS DE INICIO -->
-          <div class="quick-prompts-bar">
-            <span class="quick-label">Sugerencias para comenzar:</span>
-            <button type="button" class="quick-btn" data-text="Estuve destinado en Monte Longdon con el Regimiento de Infantería 7.">Monte Longdon (RI 7)</button>
-            <button type="button" class="quick-btn" data-text="Pertenecí al BIM 5 en Monte Tumbledown durante los combates de junio.">Tumbledown (BIM 5)</button>
-            <button type="button" class="quick-btn" data-text="Estuve en la zona de Pradera del Ganso a fines de mayo.">Pradera del Ganso</button>
-            <button type="button" class="quick-btn" data-text="Soy familiar de un veterano de Malvinas y quiero registrar sus recuerdos.">Familiar de Veterano</button>
-          </div>
-
-          <!-- COMPOSITOR DE MENSAJE -->
-          <form class="chat-composer-form" id="chatForm">
-            <div class="composer-wrapper">
-              <textarea 
-                id="chatInput" 
-                class="chat-input" 
-                placeholder="Escriba aquí sus palabras con total tranquilidad y a su propio ritmo..." 
-                rows="2"
-                required
-              ></textarea>
-              <button type="submit" class="btn btn-primary" id="btnSend">
-                <span class="btn-text">Enviar</span>
-                <span class="btn-spinner" style="display:none;">⏳</span>
-              </button>
-            </div>
-            <div class="composer-footnote">
-              🔒 Su testimonio se resguarda automáticamente y se procesa con confidencialidad ética.
-            </div>
-          </form>
+    <!-- Panel Superior Izquierdo: Selector de las 4 Escalas Cartográficas -->
+    <div class="map-floating-overlay top-left">
+      <div class="scale-selector-card glass-panel">
+        <div class="scale-header">
+          <i class="fa-solid fa-layer-group"></i>
+          <span>Nivel de Escala (1 a 4)</span>
         </div>
-      </section>
-
-      <!-- SECCIÓN LATERAL: HITOS GEOGRÁFICOS EXTRAÍDOS Y MONITOREO DE GOOGLE SHEETS -->
-      <aside class="sidebar-section">
-        
-        <!-- TARJETA: PERFIL DEL ENTREVISTADO -->
-        <div class="side-card">
-          <div class="side-card-header">
-            <h3>👤 Testimoniante</h3>
-            <span class="badge badge-sky" id="witnessRoleBadge">{{ session.witness.role }}</span>
-          </div>
-          <div class="witness-summary">
-            <p><strong>Nombre:</strong> <span id="witnessNameDisplay">{{ session.witness.name }}</span></p>
-            <p><strong>Unidad:</strong> <span id="witnessUnitDisplay">{% if session.witness.unit %}{{ session.witness.unit }}{% else %}No especificada{% endif %}</span></p>
-            <p><strong>Privacidad:</strong> <span id="witnessPrivacyDisplay">{{ session.witness.privacy_level }}</span></p>
-          </div>
+        <div class="scale-buttons" id="scale-buttons">
+          <button class="scale-btn active" data-scale="1" data-zoom="8" data-lat="-51.75" data-lng="-59.10">
+            <strong>Escala 1 <span class="scale-zoom-tag">Z ≤ 8</span></strong>
+            <small>Atlántico Sur / Archipiélago</small>
+          </button>
+          <button class="scale-btn" data-scale="2" data-zoom="10" data-lat="-51.70" data-lng="-59.00">
+            <strong>Escala 2 <span class="scale-zoom-tag">Z 9–11</span></strong>
+            <small>Isla Soledad / Gran Malvina</small>
+          </button>
+          <button class="scale-btn" data-scale="3" data-zoom="13" data-lat="-51.692" data-lng="-57.930">
+            <strong>Escala 3 <span class="scale-zoom-tag">Z 12–14</span></strong>
+            <small>Frentes de Batalla / Montes</small>
+          </button>
+          <button class="scale-btn" data-scale="4" data-zoom="16" data-lat="-51.6935" data-lng="-57.8595">
+            <strong>Escala 4 <span class="scale-zoom-tag">Z 15–18</span></strong>
+            <small>Posiciones Tácticas / Detalle Micro</small>
+          </button>
         </div>
+      </div>
+    </div>
 
-        <!-- TARJETA: GOOGLE SHEETS EN TIEMPO REAL -->
-        <div class="side-card sheets-card">
-          <div class="side-card-header">
-            <h3>📊 Google Sheets (Hoja Única)</h3>
-            <button type="button" class="btn-refresh" id="btnSyncSheets" title="Sincronizar ahora con Google Sheets">⟳</button>
-          </div>
-          <div class="sheets-info-box">
-            <div class="info-row">
-              <span class="info-label">Modo:</span>
-              <span class="info-val" id="sheetsModeText">{{ sheets_status.mode }}</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">Spreadsheet ID:</span>
-              <span class="info-val mono-code" id="sheetsIdText">{{ sheets_status.spreadsheet_id|truncatechars:20 }}</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">Pestañas:</span>
-              <span class="info-val"><code>Testimonios</code> y <code>Eventos</code></span>
-            </div>
-          </div>
-          <p class="sheets-note">
-            Cada acontecimiento detectado se anexa en tiempo real en la hoja creada por su compañero.
-          </p>
+    <!-- Panel Superior Central: Filtro por Mes -->
+    <div class="map-floating-overlay top-center" id="chronology-guide-panel">
+      <div class="chronology-guide-card glass-panel">
+        <!-- Filtro por Meses del Conflicto (Marzo a Junio 1982) -->
+        <div class="month-filter-bar" id="month-filter-bar" role="tablist" aria-label="Filtrar hechos históricos por mes">
+          <button type="button" class="month-filter-btn active" data-month="escala" id="btn-filter-escala" title="Mostrar hitos automáticamente según el nivel de zoom (Escalas 1 a 4)">
+            <i class="fa-solid fa-magnifying-glass-location"></i> Ver Todo por Escala
+          </button>
+          <button type="button" class="month-filter-btn month-marzo" data-month="marzo" title="Ver todos los hechos de Marzo de 1982">
+            <span class="month-dot"></span> Marzo 1982
+          </button>
+          <button type="button" class="month-filter-btn month-abril" data-month="abril" title="Ver todos los hechos de Abril de 1982">
+            <span class="month-dot"></span> Abril 1982
+          </button>
+          <button type="button" class="month-filter-btn month-mayo" data-month="mayo" title="Ver todos los hechos de Mayo de 1982">
+            <span class="month-dot"></span> Mayo 1982
+          </button>
+          <button type="button" class="month-filter-btn month-junio" data-month="junio" title="Ver todos los hechos de Junio de 1982">
+            <span class="month-dot"></span> Junio 1982
+          </button>
         </div>
+      </div>
+    </div>
 
-        <!-- TARJETA: ACONTECIMIENTOS HISTÓRICOS DETECTADOS -->
-        <div class="side-card events-card">
-          <div class="side-card-header">
-            <h3>📍 Acontecimientos en Malvinas (<span id="eventsCount">{{ events|length }}</span>)</h3>
+    <!-- Leyenda Cartográfica y Coordenadas -->
+    <div class="map-floating-overlay top-right">
+      <div class="coordinates-card glass-panel" id="coordinates-display">
+        <span class="coord-label"><i class="fa-solid fa-compass"></i> Posición:</span>
+        <span id="coord-values">Lat: -51.7500 | Lng: -59.1000</span>
+      </div>
+    </div>
+
+    <!-- ==================== CINTA INFERIOR DE EXPLORACIÓN FOTOGRÁFICA ==================== -->
+    <section class="photo-exploration-strip glass-panel" id="photo-strip" aria-label="Exploración fotográfica de hitos históricos">
+      <div class="strip-header">
+        <div class="strip-title">
+          <i class="fa-solid fa-camera-retro"></i>
+          <span id="strip-mode-title">Explorar Hitos y Puntos Históricos</span>
+          <span class="badge-count" id="points-count">0 puntos</span>
+        </div>
+        <div class="strip-actions">
+          <button id="btn-scroll-left" class="btn-scroll" title="Desplazar a la izquierda"><i class="fa-solid fa-chevron-left"></i></button>
+          <button id="btn-scroll-right" class="btn-scroll" title="Desplazar a la derecha"><i class="fa-solid fa-chevron-right"></i></button>
+          <button id="btn-toggle-strip" class="btn-toggle-strip" title="Minimizar / Expandir galería de fotos">
+            <i class="fa-solid fa-angle-down" id="toggle-strip-icon"></i>
+            <span id="toggle-strip-text">Ocultar fotos</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Carrusel horizontal de fotos de escala / lugares -->
+      <div class="photo-cards-container" id="photo-cards-container">
+        <!-- Generado dinámicamente desde app.js con datos de puntos históricos -->
+      </div>
+    </section>
+  </main>
+
+  <!-- ==================== MODAL DOCUMENTAL DE EXPEDIENTE HISTÓRICO ==================== -->
+  <div class="modal-backdrop" id="modal-backdrop">
+    <div class="detail-modal glass-panel" id="detail-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <button class="modal-close" id="modal-close-btn" aria-label="Cerrar ventana"><i class="fa-solid fa-xmark"></i></button>
+
+      <!-- Visor Fotográfico / Carrusel Documental -->
+      <div class="modal-gallery-wrapper">
+        <div class="modal-image-container" id="modal-image-container">
+          <img id="modal-image" src="" alt="Fotografía histórica del hito" title="Haz clic para ampliar a pantalla completa">
+
+          <!-- Controles de Navegación del Carrusel -->
+          <button type="button" class="carousel-nav-btn prev" id="modal-prev-img" aria-label="Fotografía anterior" title="Fotografía anterior">
+            <i class="fa-solid fa-chevron-left"></i>
+          </button>
+          <button type="button" class="carousel-nav-btn next" id="modal-next-img" aria-label="Fotografía siguiente" title="Fotografía siguiente">
+            <i class="fa-solid fa-chevron-right"></i>
+          </button>
+
+          <!-- Botón de Ampliación a Pantalla Completa y Contador -->
+          <div class="modal-gallery-top-bar">
+            <span class="modal-gallery-counter" id="modal-gallery-counter">Foto 1 de 3</span>
+            <button type="button" class="btn-expand-photo" id="btn-expand-photo" title="Ver fotografía en tamaño completo">
+              <i class="fa-solid fa-expand"></i> Ampliar foto
+            </button>
           </div>
-          <div class="events-scroll-container" id="eventsContainer">
-            {% for ev in events %}
-            <div class="event-card">
-              <div class="event-card-top">
-                <span class="event-place">📍 {{ ev.toponymy }}</span>
-                <span class="event-date">{{ ev.event_date }}</span>
-              </div>
-              <div class="event-coords">
-                Lat: {{ ev.latitude }} • Lng: {{ ev.longitude }}
-              </div>
-              {% if ev.units_involved %}
-              <div class="event-units">
-                🎖️ {{ ev.units_involved }}
-              </div>
-              {% endif %}
-              <div class="event-quote">
-                {{ ev.quote }}
-              </div>
-              <div class="event-status-footer">
-                <span class="badge badge-success">✓ Sincronizado</span>
-              </div>
-            </div>
-            {% empty %}
-            <div class="no-events-placeholder" id="noEventsMsg">
-              A medida que converse sobre lugares o sucesos en las islas, aparecerán aquí georreferenciados para el mapa matriz.
-            </div>
-            {% endfor %}
+
+          <!-- Etiqueta de Operación y Pie de Foto -->
+          <div class="modal-badge-container">
+            <span class="modal-tag" id="modal-tag">Zona Histórica</span>
+            <p class="modal-image-caption" id="modal-image-caption">Registro fotográfico del sector histórico.</p>
           </div>
         </div>
 
-      </aside>
+        <!-- Tira de Miniaturas Interactivas -->
+        <div class="modal-thumbnails-strip" id="modal-thumbnails">
+          <!-- Miniaturas generadas dinámicamente en app.js -->
+        </div>
+      </div>
 
-    </main>
+      <!-- Cuerpo del Expediente Histórico -->
+      <div class="modal-body">
+        <div class="modal-header-info">
+          <span class="dossier-kicker"><i class="fa-solid fa-file-shield"></i> Expediente Histórico Conmemorativo &bull; Malvinas 1982</span>
+          <h2 id="modal-title">Título del Hito</h2>
+          <p class="modal-date" id="modal-date"><i class="fa-regular fa-calendar"></i> Fecha clave: 1982</p>
+        </div>
+
+        <!-- Grilla de Ficha Táctica -->
+        <div class="tactical-sheet-grid" id="modal-tactical-sheet">
+          <div class="tactical-card">
+            <div class="tactical-card-header">
+              <i class="fa-solid fa-shield-halved"></i>
+              <span>Unidades Argentinas</span>
+            </div>
+            <p id="modal-tactical-units">—</p>
+          </div>
+
+          <div class="tactical-card">
+            <div class="tactical-card-header">
+              <i class="fa-solid fa-crosshairs"></i>
+              <span>Operación, Fecha y Escala</span>
+            </div>
+            <p id="modal-tactical-operation">—</p>
+          </div>
+
+          <div class="tactical-card">
+            <div class="tactical-card-header">
+              <i class="fa-solid fa-mountain-sun"></i>
+              <span>Terreno y Clima Austral</span>
+            </div>
+            <p id="modal-tactical-terrain">—</p>
+          </div>
+        </div>
+
+        <!-- Área de Lectura Estructurada por Secciones -->
+        <div class="modal-description" id="modal-description">
+          <section class="dossier-section">
+            <h3><i class="fa-solid fa-book-open"></i> Contexto Previo y Desarrollo del Hecho Histórico</h3>
+            <div id="modal-section-historia" class="dossier-text-content"></div>
+          </section>
+
+          <section class="dossier-section">
+            <h3><i class="fa-solid fa-users-gear"></i> Fuerzas y Unidades Argentinas Intervinientes</h3>
+            <div id="modal-section-unidades" class="dossier-text-content"></div>
+          </section>
+
+          <section class="dossier-section">
+            <h3><i class="fa-solid fa-medal"></i> Héroes Destacados, Consecuencias y Legado</h3>
+            <div id="modal-section-legado" class="dossier-text-content"></div>
+          </section>
+        </div>
+
+        <div class="modal-footer-actions">
+          <!-- Botón de enlace externo a YouTube (Se muestra automáticamente si el punto tiene videoUrl configurado en app.js) -->
+          <a href="#" target="_blank" rel="noopener noreferrer" class="btn btn-youtube" id="btn-youtube-modal" style="display: none;" title="Abrir el relato documental en YouTube en el minuto y segundo exacto">
+            <i class="fa-brands fa-youtube"></i>
+            <span>Ver relato detallado en YouTube</span>
+          </a>
+
+          <button class="btn btn-secondary" id="btn-fly-to-point">
+            <i class="fa-solid fa-location-crosshairs"></i> Enfocar Posición en el Mapa
+          </button>
+          <button class="btn btn-primary" id="btn-story-about-this">
+            <i class="fa-solid fa-feather-pointed"></i> Dejar o Consultar Testimonio sobre este hecho
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <!-- MODAL: EDICIÓN DE PERFIL DEL TESTIMONIANTE -->
-  <div class="modal-backdrop" id="profileModal" style="display:none;">
-    <div class="modal-dialog">
-      <div class="modal-header">
-        <h3>Datos del Testimoniante</h3>
-        <button type="button" class="modal-close" id="btnCloseModal">×</button>
+  <!-- Visor Lightbox de Imagen a Tamaño Completo -->
+  <div class="lightbox-backdrop" id="image-lightbox" aria-hidden="true">
+    <button type="button" class="lightbox-close" id="lightbox-close-btn" aria-label="Cerrar imagen ampliada">
+      <i class="fa-solid fa-xmark"></i>
+    </button>
+    <img id="lightbox-img" src="" alt="Fotografía histórica en tamaño completo">
+    <p id="lightbox-caption" class="lightbox-caption"></p>
+  </div>
+
+  <!-- ==================== WIDGET DE CHATBOT (BURBUJA FLOTANTE) ==================== -->
+  <div class="chatbot-widget-container" id="chatbot-container">
+    <!-- Botón Burbuja Flotante -->
+    <button class="chat-bubble-button" id="chat-toggle-button" aria-label="Abrir asistente de testimonios y consultas">
+      <i class="fa-solid fa-comment-dots icon-open"></i>
+      <i class="fa-solid fa-xmark icon-close"></i>
+      <span class="bubble-notification-dot"></span>
+    </button>
+
+    <!-- Ventana Desplegable del Chatbot -->
+    <div class="chat-window glass-panel" id="chat-window">
+      <!-- Encabezado del Chat -->
+      <div class="chat-header">
+        <div class="chat-avatar">
+          <i class="fa-solid fa-comment-dots"></i>
+        </div>
+        <div class="chat-info">
+          <h3>Asistente de Memoria</h3>
+          <p class="chat-status"><span class="status-indicator"></span> En línea</p>
+        </div>
+        <div class="chat-header-actions">
+          <button id="btn-reset-chat" title="Nueva conversación / Reiniciar"><i class="fa-solid fa-rotate-right"></i></button>
+          <button id="btn-minimize-chat" title="Minimizar chat"><i class="fa-solid fa-minus"></i></button>
+        </div>
       </div>
-      <form id="profileForm" class="modal-body">
-        <div class="form-group">
-          <label for="inputName">Nombre completo o como desea ser identificado:</label>
-          <input type="text" id="inputName" class="form-input" value="{{ session.witness.name }}">
-        </div>
 
-        <div class="form-group">
-          <label for="selectRole">Condición o Rol:</label>
-          <select id="selectRole" class="form-select">
-            <option value="Veterano de Guerra" {% if session.witness.role == 'Veterano de Guerra' %}selected{% endif %}>Veterano de Guerra de Malvinas</option>
-            <option value="Familiar Directo" {% if session.witness.role == 'Familiar Directo' %}selected{% endif %}>Familiar Directo de Veterano</option>
-            <option value="Personal Sanitario" {% if session.witness.role == 'Personal Sanitario' %}selected{% endif %}>Personal Sanitario / Sanidad</option>
-            <option value="Otro" {% if session.witness.role == 'Otro' %}selected{% endif %}>Otro Testimonio Histórico</option>
-          </select>
-        </div>
+      <!-- Selector de Modo de Interacción -->
+      <div class="chat-mode-tabs" role="tablist">
+        <button class="chat-tab active" id="tab-veterano" data-mode="testimonio_veterano" role="tab">
+          <i class="fa-solid fa-user-shield"></i> Soy Veterano
+        </button>
+        <button class="chat-tab" id="tab-consulta" data-mode="consulta_historica" role="tab">
+          <i class="fa-solid fa-book-bookmark"></i> Consulta Histórica
+        </button>
+      </div>
 
-        <div class="form-group">
-          <label for="inputUnit">Fuerza, Regimiento o Unidad (Ej: RI Mec 7, BIM 5, Fuerza Aérea):</label>
-          <input type="text" id="inputUnit" class="form-input" value="{{ session.witness.unit }}" placeholder="Ej: Ejército Argentino - RI 7">
-        </div>
+      <!-- Área de Mensajes -->
+      <div class="chat-messages" id="chat-messages">
+        {% if messages %}
+          {% for msg in messages %}
+            <div class="message-bubble {% if msg.role == 'user' %}user-message{% else %}bot-message{% endif %}">
+              <div class="bubble-text">{{ msg.content|linebreaksbr }}</div>
+              <span class="message-time">{{ msg.timestamp|date:"H:i" }}</span>
+            </div>
+          {% endfor %}
+        {% else %}
+          <!-- Mensaje de bienvenida inicial -->
+          <div class="message-bubble bot-message">
+            <div class="bubble-text">
+              ¡Hola! Es un honor recibirte en este espacio de memoria de Malvinas. Para comenzar, ¿cómo te llamás?
+            </div>
+            <span class="message-time">Ahora</span>
+          </div>
+        {% endif %}
+      </div>
 
-        <div class="form-group">
-          <label for="selectPrivacy">Nivel de Privacidad deseado:</label>
-          <select id="selectPrivacy" class="form-select">
-            <option value="Nombre Público" {% if session.witness.privacy_level == 'Nombre Público' %}selected{% endif %}>Nombre Público (Divulgar con orgullo su nombre)</option>
-            <option value="Solo Iniciales" {% if session.witness.privacy_level == 'Solo Iniciales' %}selected{% endif %}>Solo Iniciales</option>
-            <option value="Anónimo" {% if session.witness.privacy_level == 'Anónimo' %}selected{% endif %}>Anónimo</option>
-          </select>
-        </div>
+      <!-- Indicador de "Escribiendo..." -->
+      <div class="chat-typing-indicator" id="chat-typing" style="display: none;">
+        <span></span><span></span><span></span>
+        <small>Escribiendo...</small>
+      </div>
 
-        <div class="form-group-checkbox">
-          <label>
-            <input type="checkbox" id="checkConsent" {% if session.witness.consent_given %}checked{% endif %}>
-            Autorizo que los acontecimientos y relatos brindados se utilicen para la memoria pública en la web matriz y mapa de Malvinas.
-          </label>
-        </div>
+      <!-- Sugerencias Rápidas / Chips -->
+      <div class="chat-chips-container" id="chat-chips">
+        <button class="chip-btn chip-reset" id="chip-btn-reset" data-action="reset" style="background:#0f172a;color:#38bdf8;border:1px solid #0284c7;font-weight:600;"><i class="fa-solid fa-rotate-right"></i> Reiniciar chat</button>
+        <button class="chip-btn" data-text="Quiero registrar mi vivencia">Registrar vivencia</button>
+        <button class="chip-btn" data-text="¿Qué ocurrió en el Crucero General Belgrano?">Crucero Belgrano</button>
+        <button class="chip-btn" data-text="¿Qué ocurrió el 2 de abril en la Operación Rosario?">2 de Abril</button>
+        <button class="chip-btn" data-text="¿Qué ocurrió en el combate de Monte Longdon?">Monte Longdon</button>
+        <button class="chip-btn" data-text="¿Cómo fue la batalla de Pradera del Ganso y Darwin?">Pradera del Ganso</button>
+        <button class="chip-btn" data-text="¿Qué pasó en el combate de Monte Tumbledown?">Monte Tumbledown</button>
+      </div>
 
-        <div class="modal-actions">
-          <button type="button" class="btn btn-secondary" id="btnCancelModal">Cancelar</button>
-          <button type="submit" class="btn btn-primary">Guardar Cambios</button>
+      <!-- Formulario de Entrada de Mensaje -->
+      <form class="chat-input-form" id="chat-form">
+        <div class="input-wrapper">
+          <textarea id="chat-input" placeholder="Escribe tu testimonio o consulta..." rows="1" required></textarea>
         </div>
+        <button type="submit" class="btn-send-message" id="btn-send" title="Enviar mensaje">
+          <i class="fa-solid fa-paper-plane"></i>
+        </button>
       </form>
     </div>
   </div>
 
-  <!-- Lógica JavaScript del Chat -->
-  <script src="{% static 'js/chat.js' %}"></script>
+  <!-- Leaflet.js JS (100% Gratuito y Libre) -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <!-- Lógica Principal del Frontend (Sector 1) -->
+  <script src="{% static 'js/app.js' %}"></script>
 </body>
 </html>

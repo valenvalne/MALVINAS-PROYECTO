@@ -102,10 +102,23 @@ document.addEventListener("DOMContentLoaded", () => {
     const card = document.createElement("div");
     card.className = "event-card";
 
+    const vetName = ev.veteran_name || ev.veteran || "Veterano de Guerra";
+    const hasFamily = ev.testimoniante && ev.veteran_name && ev.testimoniante !== ev.veteran_name;
+
     card.innerHTML = `
       <div class="event-card-top">
         <span class="event-place">📍 ${ev.toponymy || ev.title}</span>
         <span class="event-date">${ev.event_date || '1982'}</span>
+      </div>
+      <div style="background:#f0fdf4;border-left:3px solid #16a34a;padding:5px 8px;margin:5px 0;border-radius:4px;">
+        <div style="color:#15803d;font-weight:700;font-size:0.86rem;">
+          🎖️ Veterano: ${vetName}
+        </div>
+        ${hasFamily ? `
+          <div style="color:#475569;font-size:0.75rem;margin-top:2px;">
+            ✍️ Aportado por: ${ev.testimoniante} (${ev.role || 'Familiar'})
+          </div>
+        ` : ''}
       </div>
       <div class="event-coords">
         Lat: ${ev.latitude || '-'} • Lng: ${ev.longitude || '-'}
